@@ -40,6 +40,14 @@ enum Command {
 }
 
 fn main() {
+    use Command::*;
+
     let args = Command::from_args();
-    println!("{:#?}", args);
+    match args {
+        Lex { .. } => eprintln!("Lexing is not yet implemented."),
+        Parse { .. } => eprintln!("Parsing is not yet implemented."),
+        Simplify { .. } => eprintln!("Simplification is not yet implemented."),
+        TypeCheck { .. } => eprintln!("Type Checking is not yet implemented."),
+        Compile { .. } => eprintln!("Compilation is not yet implemented."),
+    }
 }
