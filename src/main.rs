@@ -1,5 +1,6 @@
 mod interner;
 mod lexer;
+mod types;
 
 use std::path::PathBuf;
 use structopt::StructOpt;
