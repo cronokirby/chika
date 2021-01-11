@@ -1,4 +1,5 @@
 use crate::interner::StringID;
+use crate::types::BuiltinType;
 
 /// Represents the contents of a given token, letting us separate different variants.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -35,4 +36,6 @@ enum TokenType {
     IntLit(i64),
     /// A variable name
     VarName(StringID),
+    /// A builtin type, as a token
+    BuiltinType(BuiltinType),
 }
