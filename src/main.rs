@@ -15,6 +15,9 @@ use structopt::StructOpt;
 enum Command {
     /// Print the tokens produced by the lexer
     Lex {
+        /// Print using debug format instead
+        #[structopt(long = "debug")]
+        debug: bool,
         /// The file containing Chika code you want to lex
         #[structopt(name = "INPUT_FILE", parse(from_os_str))]
         input_file: PathBuf,
@@ -48,7 +51,7 @@ enum Command {
     },
 }
 
-fn lex(input_file: &Path) -> io::Result<()> {
+fn lex(input_file: &Path, debug: bool) -> io::Result<()> {
     let input = fs::read_to_string(&input_file)?;
     let mut interner = interner::StringInterner::new();
     let tokens: Vec<lexer::Token> = lexer::lex(&input, &mut interner).collect();
@@ -58,8 +61,15 @@ fn lex(input_file: &Path) -> io::Result<()> {
     let mut printer = printer::Printer::new(&mut stdout, &table);
     writeln!(&mut printer, "Tokens:")?;
     for t in tokens {
-        t.print(&mut printer)?;
+        if debug {
+            write!(&mut printer, "{:?}", t)?;
+        } else {
+            t.print(&mut printer)?;
+        }
         writeln!(&mut printer)?;
+    }
+    if debug {
+        writeln!(&mut printer, "Table:\n{:?}", &table)?;
     }
     printer.flush()
 }
@@ -69,7 +79,7 @@ fn main() -> io::Result<()> {
 
     let args = Command::from_args();
     match args {
-        Lex { input_file } => lex(&input_file)?,
+        Lex { input_file, debug } => lex(&input_file, debug)?,
         Parse { .. } => eprintln!("Parsing is not yet implemented."),
         Simplify { .. } => eprintln!("Simplification is not yet implemented."),
         TypeCheck { .. } => eprintln!("Type Checking is not yet implemented."),
