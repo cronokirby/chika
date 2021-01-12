@@ -2,6 +2,7 @@ mod interner;
 mod lexer;
 mod printer;
 mod types;
+
 use printer::Printable;
 
 use std::fs;
