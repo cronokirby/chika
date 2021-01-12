@@ -1,5 +1,6 @@
 mod interner;
 mod lexer;
+mod printer;
 mod types;
 
 use std::fs;
