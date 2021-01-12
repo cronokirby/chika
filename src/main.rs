@@ -2,7 +2,9 @@ mod interner;
 mod lexer;
 mod types;
 
-use std::path::PathBuf;
+use std::fs;
+use std::io;
+use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 
 /// A command that our CLI can process.
@@ -43,15 +45,26 @@ enum Command {
     },
 }
 
-fn main() {
+fn lex(input_file: &Path) -> io::Result<()> {
+    let input = fs::read_to_string(&input_file)?;
+    let tokens = lexer::lex(&input);
+    println!("Tokens:");
+    for tok in tokens {
+        println!("{:?}", tok);
+    }
+    Ok(())
+}
+
+fn main() -> io::Result<()> {
     use Command::*;
 
     let args = Command::from_args();
     match args {
-        Lex { .. } => eprintln!("Lexing is not yet implemented."),
+        Lex { input_file } => lex(&input_file)?,
         Parse { .. } => eprintln!("Parsing is not yet implemented."),
         Simplify { .. } => eprintln!("Simplification is not yet implemented."),
         TypeCheck { .. } => eprintln!("Type Checking is not yet implemented."),
         Compile { .. } => eprintln!("Compilation is not yet implemented."),
-    }
+    };
+    Ok(())
 }

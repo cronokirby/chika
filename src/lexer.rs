@@ -5,7 +5,7 @@ use crate::types::BuiltinType;
 
 /// Represents the contents of a given token, letting us separate different variants.
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum TokenType {
+pub enum TokenType {
     /// { symbol
     OpenBrace,
     /// } symbol,
@@ -99,6 +99,6 @@ impl<'a> Iterator for Lexer<'a> {
 ///
 /// This will return an iterator that lives as long as the string data,
 /// and yielding tokens.
-pub fn lexer<'a>(input: &'a str) -> impl Iterator<Item = TokenType> + 'a {
+pub fn lex<'a>(input: &'a str) -> impl Iterator<Item = TokenType> + 'a {
     Lexer::new(input)
 }
