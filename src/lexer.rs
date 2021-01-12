@@ -1,6 +1,6 @@
 use std::{iter::Peekable, str::Chars};
 
-use crate::interner::{self, StringID, StringInterner};
+use crate::interner::{StringID, StringInterner};
 use crate::types::BuiltinType;
 
 /// Represents the contents of a given token, letting us separate different variants.
@@ -39,7 +39,7 @@ pub enum TokenType {
     /// A variable name
     VarName(StringID),
     /// A builtin type, as a token
-    BuiltinType(BuiltinType),
+    BuiltinTypeName(BuiltinType),
 }
 
 /// A lexer uses a stream of characters to yield tokens
@@ -104,6 +104,14 @@ impl<'a> Iterator for Lexer<'a> {
             '/' => Div,
             '*' => Times,
             '=' => Equals,
+            c if c.is_uppercase() => {
+                let ident = self.continue_identifier(c);
+                match ident.as_str() {
+                    "I32" => BuiltinTypeName(BuiltinType::I32),
+                    "Unit" => BuiltinTypeName(BuiltinType::Unit),
+                    _ => panic!("Unknown type: {}", ident),
+                }
+            }
             c if c.is_alphabetic() => {
                 let ident = self.continue_identifier(c);
                 match ident.as_str() {
