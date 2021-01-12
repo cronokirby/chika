@@ -18,6 +18,8 @@ pub enum TokenType {
     Semicolon,
     /// : symbol
     Colon,
+    /// , symbol
+    Comma,
     /// + symbol
     Plus,
     /// - symbol
@@ -118,6 +120,7 @@ impl<'a> Iterator for Lexer<'a> {
             '/' => Div,
             '*' => Times,
             '=' => Equals,
+            ',' => Comma,
             c if c.is_digit(10) => {
                 let lit = self.continue_int_lit(c);
                 IntLit(lit)
