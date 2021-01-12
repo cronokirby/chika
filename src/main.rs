@@ -2,9 +2,11 @@ mod interner;
 mod lexer;
 mod printer;
 mod types;
+use printer::Printable;
 
 use std::fs;
 use std::io;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 
@@ -49,13 +51,17 @@ enum Command {
 fn lex(input_file: &Path) -> io::Result<()> {
     let input = fs::read_to_string(&input_file)?;
     let mut interner = interner::StringInterner::new();
-    let tokens = lexer::lex(&input, &mut interner);
-    println!("Tokens:");
-    for tok in tokens {
-        println!("{:?}", tok);
+    let tokens: Vec<lexer::Token> = lexer::lex(&input, &mut interner).collect();
+
+    let table = interner.make_table();
+    let mut stdout = io::stdout();
+    let mut printer = printer::Printer::new(&mut stdout, &table);
+    writeln!(&mut printer, "Tokens:")?;
+    for t in tokens {
+        t.print(&mut printer)?;
+        writeln!(&mut printer)?;
     }
-    println!("Table:\n {:?}", interner.make_table());
-    Ok(())
+    printer.flush()
 }
 
 fn main() -> io::Result<()> {

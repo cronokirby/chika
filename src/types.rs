@@ -1,6 +1,6 @@
 use crate::printer::{Printable, Printer};
-use std::fmt;
-use std::fmt::Write;
+use std::io;
+use std::io::Write;
 
 /// Represents a kind of builtin type we know about
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -12,7 +12,7 @@ pub enum BuiltinType {
 }
 
 impl Printable for BuiltinType {
-    fn print<'a>(&self, printer: &mut Printer<'a>) -> fmt::Result {
+    fn print<'a>(&self, printer: &mut Printer<'a>) -> io::Result<()> {
         use BuiltinType::*;
 
         match self {

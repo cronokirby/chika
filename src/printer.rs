@@ -1,18 +1,28 @@
-use std::fmt;
+use std::io;
 
 use crate::interner::StringTable;
 
 pub struct Printer<'a> {
-    buf: &'a mut dyn fmt::Write,
+    buf: &'a mut dyn io::Write,
     pub table: &'a StringTable,
 }
 
-impl<'a> fmt::Write for Printer<'a> {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.buf.write_str(s)
+impl<'a> Printer<'a> {
+    pub fn new(buf: &'a mut dyn io::Write, table: &'a StringTable) -> Self {
+        Self { buf, table }
+    }
+}
+
+impl<'a> io::Write for Printer<'a> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.buf.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.buf.flush()
     }
 }
 
 pub trait Printable {
-    fn print<'a>(&self, printer: &mut Printer<'a>) -> fmt::Result;
+    fn print<'a>(&self, printer: &mut Printer<'a>) -> io::Result<()>;
 }

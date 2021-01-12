@@ -1,7 +1,10 @@
 use std::{iter::Peekable, ops::Range, str::Chars};
 
 use crate::interner::{StringID, StringInterner};
+use crate::printer::{Printable, Printer};
 use crate::types::BuiltinType;
+use std::io;
+use std::io::Write;
 
 /// Represents the contents of a given token, letting us separate different variants.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -44,6 +47,33 @@ pub enum TokenType {
     BuiltinTypeName(BuiltinType),
 }
 
+impl Printable for TokenType {
+    fn print<'a>(&self, printer: &mut Printer<'a>) -> io::Result<()> {
+        use TokenType::*;
+
+        match *self {
+            OpenBrace => write!(printer, "{{"),
+            CloseBrace => write!(printer, "}}"),
+            OpenParens => write!(printer, "("),
+            CloseParens => write!(printer, ")"),
+            Semicolon => write!(printer, ";"),
+            Colon => write!(printer, ":"),
+            Comma => write!(printer, ","),
+            Plus => write!(printer, "+"),
+            Minus => write!(printer, "-"),
+            Div => write!(printer, "/"),
+            Times => write!(printer, "*"),
+            Equals => write!(printer, "="),
+            Fn => write!(printer, "fn"),
+            Return => write!(printer, "return"),
+            Var => write!(printer, "var"),
+            IntLit(i) => write!(printer, "{}", i),
+            VarName(id) => write!(printer, "{}", &printer.table[id]),
+            BuiltinTypeName(b) => b.print(printer),
+        }
+    }
+}
+
 /// A token that we actually emit.
 ///
 /// This includes the range in the source code that the token spans, as well
@@ -60,6 +90,13 @@ impl Token {
     /// Create a new token from a range and a token type
     pub fn new(range: Range<usize>, token: TokenType) -> Self {
         Token { range, token }
+    }
+}
+
+impl Printable for Token {
+    fn print<'a>(&self, printer: &mut Printer<'a>) -> io::Result<()> {
+        self.token.print(printer)?;
+        write!(printer, "\t{:?}", self.range)
     }
 }
 
