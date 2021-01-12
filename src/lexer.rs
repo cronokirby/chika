@@ -35,7 +35,7 @@ pub enum TokenType {
     /// `var` keyword
     Var,
     /// An integer litteral
-    IntLit(i64),
+    IntLit(u32),
     /// A variable name
     VarName(StringID),
     /// A builtin type, as a token
@@ -77,6 +77,20 @@ impl<'a> Lexer<'a> {
         }
         ident
     }
+
+    fn continue_int_lit(&mut self, start: char) -> u32 {
+        let mut acc: u32 = start.to_digit(10).unwrap();
+        while let Some(&peek) = self.chars.peek() {
+            match peek.to_digit(10) {
+                None => break,
+                Some(d) => {
+                    self.chars.next();
+                    acc = 10 * acc + d
+                }
+            }
+        }
+        acc
+    }
 }
 
 impl<'a> Iterator for Lexer<'a> {
@@ -104,6 +118,10 @@ impl<'a> Iterator for Lexer<'a> {
             '/' => Div,
             '*' => Times,
             '=' => Equals,
+            c if c.is_digit(10) => {
+                let lit = self.continue_int_lit(c);
+                IntLit(lit)
+            }
             c if c.is_uppercase() => {
                 let ident = self.continue_identifier(c);
                 match ident.as_str() {
