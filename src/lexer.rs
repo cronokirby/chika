@@ -1,4 +1,4 @@
-use std::{iter::Peekable, str::Chars};
+use std::{iter::Peekable, ops::Range, str::Chars};
 
 use crate::interner::{StringID, StringInterner};
 use crate::types::BuiltinType;
@@ -44,11 +44,34 @@ pub enum TokenType {
     BuiltinTypeName(BuiltinType),
 }
 
+/// A token that we actually emit.
+///
+/// This includes the range in the source code that the token spans, as well
+/// as the underlying token type.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Token {
+    /// The range in indices that this token spans in the code
+    pub range: Range<usize>,
+    /// The underlying type of this token
+    pub token: TokenType,
+}
+
+impl Token {
+    /// Create a new token from a range and a token type
+    pub fn new(range: Range<usize>, token: TokenType) -> Self {
+        Token { range, token }
+    }
+}
+
 /// A lexer uses a stream of characters to yield tokens
 #[derive(Debug)]
 struct Lexer<'a> {
     /// An iterator of characters we can peek
     chars: Peekable<Chars<'a>>,
+    /// The start position of the current token
+    start: usize,
+    /// The end position of the current token
+    end: usize,
     /// The interner for strings we encounter
     interner: &'a mut StringInterner,
 }
@@ -57,14 +80,24 @@ impl<'a> Lexer<'a> {
     fn new(input: &'a str, interner: &'a mut StringInterner) -> Self {
         Lexer {
             chars: input.chars().peekable(),
+            start: 0,
+            end: 0,
             interner,
         }
+    }
+
+    fn next_char(&mut self) -> Option<char> {
+        let next = self.chars.next();
+        if next.is_some() {
+            self.end += 1;
+        }
+        next
     }
 
     fn skip_whitespace(&mut self) {
         // UNSTABLE: you could use `next_if` here when it stabilizes
         while self.chars.peek().map_or(false, |c| c.is_whitespace()) {
-            self.chars.next();
+            self.next_char();
         }
     }
 
@@ -74,7 +107,7 @@ impl<'a> Lexer<'a> {
             if !peek.is_alphanumeric() {
                 break;
             }
-            self.chars.next();
+            self.next_char();
             ident.push(peek);
         }
         ident
@@ -86,7 +119,7 @@ impl<'a> Lexer<'a> {
             match peek.to_digit(10) {
                 None => break,
                 Some(d) => {
-                    self.chars.next();
+                    self.next_char();
                     acc = 10 * acc + d
                 }
             }
@@ -96,14 +129,16 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Iterator for Lexer<'a> {
-    type Item = TokenType;
+    type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
         use TokenType::*;
 
         self.skip_whitespace();
 
-        let next = match self.chars.next() {
+        self.start = self.end;
+
+        let next = match self.next_char() {
             None => return None,
             Some(c) => c,
         };
@@ -144,7 +179,9 @@ impl<'a> Iterator for Lexer<'a> {
             }
             c => panic!("unexpected character {}", c),
         };
-        Some(item)
+
+        let range = self.start..self.end;
+        Some(Token::new(range, item))
     }
 }
 
@@ -155,6 +192,6 @@ impl<'a> Iterator for Lexer<'a> {
 pub fn lex<'a>(
     input: &'a str,
     interner: &'a mut StringInterner,
-) -> impl Iterator<Item = TokenType> + 'a {
+) -> impl Iterator<Item = Token> + 'a {
     Lexer::new(input, interner)
 }
