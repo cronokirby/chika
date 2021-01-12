@@ -47,11 +47,13 @@ enum Command {
 
 fn lex(input_file: &Path) -> io::Result<()> {
     let input = fs::read_to_string(&input_file)?;
-    let tokens = lexer::lex(&input);
+    let mut interner = interner::StringInterner::new();
+    let tokens = lexer::lex(&input, &mut interner);
     println!("Tokens:");
     for tok in tokens {
         println!("{:?}", tok);
     }
+    println!("Table:\n {:?}", interner.make_table());
     Ok(())
 }
 

@@ -1,6 +1,6 @@
 use std::{iter::Peekable, str::Chars};
 
-use crate::interner::StringID;
+use crate::interner::{self, StringID, StringInterner};
 use crate::types::BuiltinType;
 
 /// Represents the contents of a given token, letting us separate different variants.
@@ -47,12 +47,15 @@ pub enum TokenType {
 struct Lexer<'a> {
     /// An iterator of characters we can peek
     chars: Peekable<Chars<'a>>,
+    /// The interner for strings we encounter
+    interner: &'a mut StringInterner,
 }
 
 impl<'a> Lexer<'a> {
-    fn new(input: &'a str) -> Self {
+    fn new(input: &'a str, interner: &'a mut StringInterner) -> Self {
         Lexer {
             chars: input.chars().peekable(),
+            interner,
         }
     }
 
@@ -61,6 +64,18 @@ impl<'a> Lexer<'a> {
         while self.chars.peek().map_or(false, |c| c.is_whitespace()) {
             self.chars.next();
         }
+    }
+
+    fn continue_identifier(&mut self, start: char) -> String {
+        let mut ident = String::from(start);
+        while let Some(&peek) = self.chars.peek() {
+            if !peek.is_alphanumeric() {
+                break;
+            }
+            self.chars.next();
+            ident.push(peek);
+        }
+        ident
     }
 }
 
@@ -89,6 +104,15 @@ impl<'a> Iterator for Lexer<'a> {
             '/' => Div,
             '*' => Times,
             '=' => Equals,
+            c if c.is_alphabetic() => {
+                let ident = self.continue_identifier(c);
+                match ident.as_str() {
+                    "fn" => Fn,
+                    "return" => Return,
+                    "var" => Var,
+                    _ => VarName(self.interner.intern(ident)),
+                }
+            }
             c => panic!("unexpected character {}", c),
         };
         Some(item)
@@ -99,6 +123,9 @@ impl<'a> Iterator for Lexer<'a> {
 ///
 /// This will return an iterator that lives as long as the string data,
 /// and yielding tokens.
-pub fn lex<'a>(input: &'a str) -> impl Iterator<Item = TokenType> + 'a {
-    Lexer::new(input)
+pub fn lex<'a>(
+    input: &'a str,
+    interner: &'a mut StringInterner,
+) -> impl Iterator<Item = TokenType> + 'a {
+    Lexer::new(input, interner)
 }

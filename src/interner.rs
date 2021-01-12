@@ -15,6 +15,7 @@ pub struct StringID(u32);
 ///
 /// This struct implements [Index](std::ops::Index), so you can do `table[id]`, provided `id`
 /// is a [StringID](StringID)
+#[derive(Debug)]
 pub struct StringTable {
     table: Vec<String>,
 }
@@ -45,6 +46,7 @@ impl Index<StringID> for StringTable {
 /// assert_eq!(id1, id3);
 /// assert_ne!(id1, id2);
 /// ```
+#[derive(Debug)]
 pub struct StringInterner {
     ids: HashMap<String, StringID>,
     table: Vec<String>,
