@@ -100,6 +100,23 @@ impl Printable for Token {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+enum ErrorType {
+    UnexpectedChar(char),
+}
+
+impl ErrorType {
+    fn at(self, range: Range<usize>) -> Error {
+        Error { error: self, range }
+    }
+}
+
+#[derive(Debug)]
+pub struct Error {
+    range: Range<usize>,
+    error: ErrorType,
+}
+
 /// A lexer uses a stream of characters to yield tokens
 #[derive(Debug)]
 struct Lexer<'a> {
@@ -166,7 +183,7 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Iterator for Lexer<'a> {
-    type Item = Token;
+    type Item = Result<Token, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         use TokenType::*;
@@ -214,11 +231,11 @@ impl<'a> Iterator for Lexer<'a> {
                     _ => VarName(self.interner.intern(ident)),
                 }
             }
-            c => panic!("unexpected character {}", c),
+            c => return Some(Err(ErrorType::UnexpectedChar(c).at(self.start..self.end))),
         };
 
         let range = self.start..self.end;
-        Some(Token::new(range, item))
+        Some(Ok(Token::new(range, item)))
     }
 }
 
@@ -229,6 +246,6 @@ impl<'a> Iterator for Lexer<'a> {
 pub fn lex<'a>(
     input: &'a str,
     interner: &'a mut StringInterner,
-) -> impl Iterator<Item = Token> + 'a {
+) -> impl Iterator<Item = Result<Token, Error>> + 'a {
     Lexer::new(input, interner)
 }

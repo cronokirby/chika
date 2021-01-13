@@ -55,7 +55,22 @@ enum Command {
 fn lex(input_file: &Path, debug: bool) -> io::Result<()> {
     let input = fs::read_to_string(&input_file)?;
     let mut interner = interner::StringInterner::new();
-    let tokens: Vec<lexer::Token> = lexer::lex(&input, &mut interner).collect();
+
+    let mut tokens = Vec::<lexer::Token>::new();
+    let mut errors = Vec::<lexer::Error>::new();
+    for res in lexer::lex(&input, &mut interner) {
+        match res {
+            Ok(tok) => tokens.push(tok),
+            Err(e) => errors.push(e),
+        }
+    }
+    if !errors.is_empty() {
+        println!("Lexer Errors:");
+        for e in errors {
+            println!("{:?}", e);
+        }
+        return Ok(());
+    }
 
     let table = interner.make_table();
     let mut stdout = io::stdout();
