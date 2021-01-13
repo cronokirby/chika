@@ -1,7 +1,10 @@
 use std::{iter::Peekable, ops::Range, str::Chars};
 
+use codespan_reporting::diagnostic::Diagnostic;
+
+use crate::codespan_reporting::diagnostic::Label;
 use crate::interner::{StringID, StringInterner};
-use crate::printer::{Printable, Printer};
+use crate::presentation::{Printable, Printer};
 use crate::types::BuiltinType;
 use std::io;
 use std::io::Write;
@@ -115,6 +118,20 @@ impl ErrorType {
 pub struct Error {
     range: Range<usize>,
     error: ErrorType,
+}
+
+impl Printable for Error {
+    fn print<'a>(&self, printer: &mut Printer<'a>) -> io::Result<()> {
+        use ErrorType::*;
+
+        let diagnostic = match self.error {
+            UnexpectedChar(c) => Diagnostic::error()
+                .with_message(format!("Unexpected Character: `{}`", c))
+                .with_labels(vec![Label::primary((), self.range.clone())]),
+        };
+        printer.write_diagnostic(diagnostic);
+        Ok(())
+    }
 }
 
 /// A lexer uses a stream of characters to yield tokens

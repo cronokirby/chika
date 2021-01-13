@@ -1,15 +1,20 @@
 mod interner;
 mod lexer;
-mod printer;
+mod presentation;
 mod types;
 
-use printer::Printable;
+use presentation::Printable;
 
 use std::fs;
 use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
+
+extern crate codespan_reporting;
+
+use codespan_reporting::term::termcolor::{Color, ColorSpec, StandardStream, WriteColor};
+use codespan_reporting::{files::SimpleFile, term::termcolor::ColorChoice};
 
 /// A command that our CLI can process.
 #[derive(Debug, StructOpt)]
@@ -54,40 +59,50 @@ enum Command {
 
 fn lex(input_file: &Path, debug: bool) -> io::Result<()> {
     let input = fs::read_to_string(&input_file)?;
+    let file_name = input_file.to_string_lossy().to_string();
+    let simple_file = SimpleFile::new(file_name, input);
     let mut interner = interner::StringInterner::new();
 
     let mut tokens = Vec::<lexer::Token>::new();
     let mut errors = Vec::<lexer::Error>::new();
-    for res in lexer::lex(&input, &mut interner) {
+    for res in lexer::lex(simple_file.source(), &mut interner) {
         match res {
             Ok(tok) => tokens.push(tok),
             Err(e) => errors.push(e),
         }
     }
     if !errors.is_empty() {
-        println!("Lexer Errors:");
+        let table = interner.make_table();
+        let mut out = StandardStream::stderr(ColorChoice::Always);
+        let mut printer = presentation::Printer::new(&mut out, &table, &simple_file);
+        printer
+            .buf
+            .set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))
+            .unwrap();
+        writeln!(&mut printer, "Lexer Errors:\n")?;
+        printer.buf.reset().unwrap();
         for e in errors {
-            println!("{:?}", e);
+            e.print(&mut printer)?;
         }
         return Ok(());
-    }
-
-    let table = interner.make_table();
-    let mut stdout = io::stdout();
-    let mut printer = printer::Printer::new(&mut stdout, &table);
-    writeln!(&mut printer, "Tokens:")?;
-    for t in tokens {
-        if debug {
-            write!(&mut printer, "{:?}", t)?;
-        } else {
-            t.print(&mut printer)?;
+    } else if debug {
+        let table = interner.make_table();
+        for t in tokens {
+            println!("{:?}", t);
         }
-        writeln!(&mut printer)?;
+        println!("Table:\n{:?}", &table);
+    } else {
+        let table = interner.make_table();
+        let mut stdout = StandardStream::stdout(ColorChoice::Always);
+        let mut printer = presentation::Printer::new(&mut stdout, &table, &simple_file);
+        writeln!(&mut printer, "Tokens:")?;
+        for t in tokens {
+            t.print(&mut printer)?;
+            writeln!(&mut printer)?;
+        }
+        printer.flush()?;
     }
-    if debug {
-        writeln!(&mut printer, "Table:\n{:?}", &table)?;
-    }
-    printer.flush()
+    Ok(())
 }
 
 fn main() -> io::Result<()> {
