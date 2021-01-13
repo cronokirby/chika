@@ -13,7 +13,7 @@ use structopt::StructOpt;
 
 extern crate codespan_reporting;
 
-use codespan_reporting::term::termcolor::{Color, ColorSpec, StandardStream, WriteColor};
+use codespan_reporting::term::termcolor::{Color, ColorSpec, StandardStream};
 use codespan_reporting::{files::SimpleFile, term::termcolor::ColorChoice};
 
 /// A command that our CLI can process.
