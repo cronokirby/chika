@@ -7,7 +7,6 @@ mod types;
 use context::{Context, Printable};
 use errors::Error;
 
-use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
