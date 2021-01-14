@@ -1,5 +1,7 @@
-use crate::context::{Printable, Printer};
-use std::io;
+use crate::{
+    context::{Printable, Printer},
+    errors::Error,
+};
 use std::io::Write;
 
 /// Represents a kind of builtin type we know about
@@ -12,12 +14,13 @@ pub enum BuiltinType {
 }
 
 impl Printable for BuiltinType {
-    fn print<'a>(&self, printer: &mut Printer<'a>) -> io::Result<()> {
+    fn print<'a>(&self, printer: &mut Printer<'a>) -> Result<(), Error> {
         use BuiltinType::*;
 
         match self {
-            I32 => write!(printer, "I32"),
-            Unit => write!(printer, "Unit"),
+            I32 => write!(printer, "I32")?,
+            Unit => write!(printer, "Unit")?,
         }
+        Ok(())
     }
 }

@@ -3,10 +3,10 @@ use std::{iter::Peekable, ops::Range, str::Chars};
 use codespan_reporting::diagnostic::Diagnostic;
 
 use crate::context::{Context, Printable, Printer, StringID};
+use crate::errors;
 use crate::interner::StringInterner;
 use crate::types::BuiltinType;
 use crate::{codespan_reporting::diagnostic::Label, context::FileID};
-use std::io;
 use std::io::Write;
 
 /// Represents the contents of a given token, letting us separate different variants.
@@ -51,29 +51,30 @@ pub enum TokenType {
 }
 
 impl Printable for TokenType {
-    fn print<'a>(&self, printer: &mut Printer<'a>) -> io::Result<()> {
+    fn print<'a>(&self, printer: &mut Printer<'a>) -> errors::Result<()> {
         use TokenType::*;
 
         match *self {
-            OpenBrace => write!(printer, "{{"),
-            CloseBrace => write!(printer, "}}"),
-            OpenParens => write!(printer, "("),
-            CloseParens => write!(printer, ")"),
-            Semicolon => write!(printer, ";"),
-            Colon => write!(printer, ":"),
-            Comma => write!(printer, ","),
-            Plus => write!(printer, "+"),
-            Minus => write!(printer, "-"),
-            Div => write!(printer, "/"),
-            Times => write!(printer, "*"),
-            Equals => write!(printer, "="),
-            Fn => write!(printer, "fn"),
-            Return => write!(printer, "return"),
-            Var => write!(printer, "var"),
-            IntLit(i) => write!(printer, "{}", i),
-            VarName(id) => write!(printer, "{}", printer.ctx.get_string(id)),
-            BuiltinTypeName(b) => b.print(printer),
+            OpenBrace => write!(printer, "{{")?,
+            CloseBrace => write!(printer, "}}")?,
+            OpenParens => write!(printer, "(")?,
+            CloseParens => write!(printer, ")")?,
+            Semicolon => write!(printer, ";")?,
+            Colon => write!(printer, ":")?,
+            Comma => write!(printer, ",")?,
+            Plus => write!(printer, "+")?,
+            Minus => write!(printer, "-")?,
+            Div => write!(printer, "/")?,
+            Times => write!(printer, "*")?,
+            Equals => write!(printer, "=")?,
+            Fn => write!(printer, "fn")?,
+            Return => write!(printer, "return")?,
+            Var => write!(printer, "var")?,
+            IntLit(i) => write!(printer, "{}", i)?,
+            VarName(id) => write!(printer, "{}", printer.ctx.get_string(id))?,
+            BuiltinTypeName(b) => b.print(printer)?,
         }
+        Ok(())
     }
 }
 
@@ -97,9 +98,10 @@ impl Token {
 }
 
 impl Printable for Token {
-    fn print<'a>(&self, printer: &mut Printer<'a>) -> io::Result<()> {
+    fn print<'a>(&self, printer: &mut Printer<'a>) -> errors::Result<()> {
         self.token.print(printer)?;
-        write!(printer, "\t{:?}", self.range)
+        write!(printer, "\t{:?}", self.range)?;
+        Ok(())
     }
 }
 
@@ -126,7 +128,7 @@ pub struct Error {
 }
 
 impl Printable for Error {
-    fn print<'a>(&self, printer: &mut Printer<'a>) -> io::Result<()> {
+    fn print<'a>(&self, printer: &mut Printer<'a>) -> errors::Result<()> {
         use ErrorType::*;
 
         let diagnostic = match self.error {
@@ -134,8 +136,7 @@ impl Printable for Error {
                 .with_message(format!("Unexpected Character: `{}`", c))
                 .with_labels(vec![Label::primary(self.file, self.range.clone())]),
         };
-        printer.write_diagnostic(diagnostic);
-        Ok(())
+        printer.write_diagnostic(diagnostic)
     }
 }
 

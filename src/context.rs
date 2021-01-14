@@ -5,8 +5,8 @@ use std::path::Path;
 
 use codespan_reporting::files;
 
-use crate::codespan_reporting::diagnostic::Diagnostic;
-use crate::codespan_reporting::term;
+use crate::{codespan_reporting::diagnostic::Diagnostic, errors::Error};
+use crate::{codespan_reporting::term, errors};
 use term::termcolor::ColorSpec;
 use term::termcolor::WriteColor;
 
@@ -162,9 +162,10 @@ impl<'a> Printer<'a> {
         Self { buf, ctx }
     }
 
-    pub fn write_diagnostic(&mut self, diagnostic: Diagnostic<FileID>) {
+    pub fn write_diagnostic(&mut self, diagnostic: Diagnostic<FileID>) -> Result<(), Error> {
         let config = term::Config::default();
-        term::emit(self.buf, &config, self.ctx, &diagnostic).unwrap();
+        term::emit(self.buf, &config, self.ctx, &diagnostic)?;
+        Ok(())
     }
 }
 
@@ -197,5 +198,5 @@ impl<'a> WriteColor for Printer<'a> {
 /// This is commonly used for things that benefit from having access to this context,
 /// so that they can print String IDs with actual strings, for example.
 pub trait Printable {
-    fn print<'a>(&self, printer: &mut Printer<'a>) -> io::Result<()>;
+    fn print<'a>(&self, printer: &mut Printer<'a>) -> errors::Result<()>;
 }

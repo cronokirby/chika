@@ -1,9 +1,11 @@
 mod context;
+mod errors;
 mod interner;
 mod lexer;
 mod types;
 
 use context::{Context, Printable};
+use errors::Error;
 
 use std::io;
 use std::io::Write;
@@ -56,7 +58,7 @@ enum Command {
     },
 }
 
-fn lex(input_file: &Path, debug: bool) -> io::Result<()> {
+fn lex(input_file: &Path, debug: bool) -> Result<(), Error> {
     let mut ctx = Context::with_main_file(input_file)?;
 
     let mut tokens = Vec::<lexer::Token>::new();
@@ -98,16 +100,30 @@ fn lex(input_file: &Path, debug: bool) -> io::Result<()> {
     Ok(())
 }
 
-fn main() -> io::Result<()> {
+fn main() {
     use Command::*;
 
     let args = Command::from_args();
-    match args {
-        Lex { input_file, debug } => lex(&input_file, debug)?,
-        Parse { .. } => eprintln!("Parsing is not yet implemented."),
-        Simplify { .. } => eprintln!("Simplification is not yet implemented."),
-        TypeCheck { .. } => eprintln!("Type Checking is not yet implemented."),
-        Compile { .. } => eprintln!("Compilation is not yet implemented."),
+    let res = match args {
+        Lex { input_file, debug } => lex(&input_file, debug),
+        Parse { .. } => {
+            eprintln!("Parsing is not yet implemented.");
+            Ok(())
+        }
+        Simplify { .. } => {
+            eprintln!("Simplification is not yet implemented.");
+            Ok(())
+        }
+        TypeCheck { .. } => {
+            eprintln!("Type Checking is not yet implemented.");
+            Ok(())
+        }
+        Compile { .. } => {
+            eprintln!("Compilation is not yet implemented.");
+            Ok(())
+        }
     };
-    Ok(())
+    if let Err(e) = res {
+        eprintln!("Unexpected Error:\n{}", e);
+    }
 }
