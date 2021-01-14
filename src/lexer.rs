@@ -168,8 +168,8 @@ impl<'a> Lexer<'a> {
 
     fn next_char(&mut self) -> Option<char> {
         let next = self.chars.next();
-        if next.is_some() {
-            self.end += 1;
+        if let Some(c) = next{
+            self.end += c.len_utf8();
         }
         next
     }
