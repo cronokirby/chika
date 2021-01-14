@@ -63,7 +63,7 @@ fn lex(input_file: &Path, debug: bool) -> io::Result<()> {
     let input = fs::read_to_string(&input_file)?;
     let file_name = input_file.to_string_lossy().to_string();
     let simple_file = SimpleFile::new(file_name, input);
-    let mut interner = interner::StringInterner::new();
+    let mut interner = interner::StringInterner::new(&mut ctx);
 
     let mut tokens = Vec::<lexer::Token>::new();
     let mut errors = Vec::<lexer::Error>::new();
@@ -74,7 +74,6 @@ fn lex(input_file: &Path, debug: bool) -> io::Result<()> {
         }
     }
     if !errors.is_empty() {
-        ctx.set_table(interner.make_table());
         let mut out = StandardStream::stderr(ColorChoice::Always);
         let mut printer = context::Printer::new(&mut out, &ctx, &simple_file);
         printer.set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))?;
@@ -85,13 +84,11 @@ fn lex(input_file: &Path, debug: bool) -> io::Result<()> {
         }
         return Ok(());
     } else if debug {
-        let table = interner.make_table();
         for t in tokens {
             println!("{:?}", t);
         }
-        println!("Table:\n{:?}", &table);
+        println!("Contxt:\n{:?}", &ctx);
     } else {
-        ctx.set_table(interner.make_table());
         let mut stdout = StandardStream::stdout(ColorChoice::Always);
         let mut printer = context::Printer::new(&mut stdout, &ctx, &simple_file);
         writeln!(&mut printer, "Tokens:")?;

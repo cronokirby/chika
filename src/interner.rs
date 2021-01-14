@@ -1,32 +1,6 @@
-use std::{collections::HashMap, ops::Index};
+use std::collections::HashMap;
 
-/// A String ID can be used in place of a string basically everywhere.
-///
-/// The idea is that each unique String ID corresponds to an original string
-/// in the source code. The advantage of using IDs is that comparison is much faster,
-/// and they use up much less space.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct StringID(u32);
-
-/// A table mapping StringIDs to their original Strings.
-///
-/// After interning, you have a bunch of IDs representing Strings in the original
-/// source code. This table allows displaying these IDs using those strings.
-///
-/// This struct implements [Index](std::ops::Index), so you can do `table[id]`, provided `id`
-/// is a [StringID](StringID)
-#[derive(Debug)]
-pub struct StringTable {
-    table: Vec<String>,
-}
-
-impl Index<StringID> for StringTable {
-    type Output = str;
-
-    fn index(&self, index: StringID) -> &Self::Output {
-        self.table.index(index.0 as usize)
-    }
-}
+use crate::context::{Context, StringID};
 
 /// A String interner lets us accumulate strings into a table, mapping them into IDs.
 ///
@@ -47,17 +21,17 @@ impl Index<StringID> for StringTable {
 /// assert_ne!(id1, id2);
 /// ```
 #[derive(Debug)]
-pub struct StringInterner {
+pub struct StringInterner<'a> {
+    ctx: &'a mut Context,
     ids: HashMap<String, StringID>,
-    table: Vec<String>,
 }
 
-impl StringInterner {
+impl<'a> StringInterner<'a> {
     /// Create a new interner, with no state whatsoever.
-    pub fn new() -> Self {
+    pub fn new(ctx: &'a mut Context) -> Self {
         Self {
+            ctx,
             ids: HashMap::new(),
-            table: Vec::new(),
         }
     }
 
@@ -69,18 +43,9 @@ impl StringInterner {
         if let Some(&id) = self.ids.get(&string) {
             return id;
         }
-        let id = StringID(self.table.len() as u32);
-        self.table.push(string.clone());
+        let id = self.ctx.add_string(string.clone());
         self.ids.insert(string, id);
         id
-    }
-
-    /// Consume this interner, and get a table of all the strings interned.
-    ///
-    /// Since this moves the interner, this should only be called after all
-    /// the strings you'd want to intern have been seen.
-    pub fn make_table(self) -> StringTable {
-        StringTable { table: self.table }
     }
 }
 
@@ -90,7 +55,8 @@ mod test {
 
     #[test]
     fn adding_two_strings_gives_different_ids() {
-        let mut interner = StringInterner::new();
+        let mut ctx = Context::new();
+        let mut interner = StringInterner::new(&mut ctx);
         let id1 = interner.intern("A".into());
         let id2 = interner.intern("B".into());
         assert_ne!(id1, id2);
@@ -98,7 +64,8 @@ mod test {
 
     #[test]
     fn adding_same_string_gives_same_ids() {
-        let mut interner = StringInterner::new();
+        let mut ctx = Context::new();
+        let mut interner = StringInterner::new(&mut ctx);
         let id1 = interner.intern("A".into());
         let id2 = interner.intern("A".into());
         assert_eq!(id1, id2);
@@ -106,11 +73,11 @@ mod test {
 
     #[test]
     fn making_table_uses_interned_strings() {
-        let mut interner = StringInterner::new();
+        let mut ctx = Context::new();
+        let mut interner = StringInterner::new(&mut ctx);
         let id1 = interner.intern("A".into());
         let id2 = interner.intern("B".into());
-        let table = interner.make_table();
-        assert_eq!(&table[id1], "A");
-        assert_eq!(&table[id2], "B");
+        assert_eq!(ctx.get_string(id1), "A");
+        assert_eq!(ctx.get_string(id2), "B");
     }
 }

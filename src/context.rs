@@ -4,26 +4,35 @@ use codespan_reporting::files::SimpleFile;
 
 use crate::codespan_reporting::diagnostic::Diagnostic;
 use crate::codespan_reporting::term;
-use crate::interner::{StringID, StringTable};
 use term::termcolor::ColorSpec;
 use term::termcolor::WriteColor;
 
+/// A String ID can be used in place of a string basically everywhere.
+///
+/// The idea is that each unique String ID corresponds to an original string
+/// in the source code. The advantage of using IDs is that comparison is much faster,
+/// and they use up much less space.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct StringID(u32);
+
+#[derive(Debug)]
 pub struct Context {
-    table: Option<StringTable>,
+    table: Vec<String>,
 }
 
 impl Context {
     pub fn new() -> Self {
-        Context { table: None }
+        Context { table: Vec::new() }
     }
 
-    pub fn set_table(&mut self, table: StringTable) {
-        self.table = Some(table)
+    pub fn add_string(&mut self, string: String) -> StringID {
+        let id = StringID(self.table.len() as u32);
+        self.table.push(string);
+        id
     }
 
     pub fn get_string(&self, id: StringID) -> &str {
-        let table = self.table.as_ref().expect("empty string table");
-        &table[id]
+        &self.table[id.0 as usize]
     }
 }
 

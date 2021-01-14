@@ -3,8 +3,8 @@ use std::{iter::Peekable, ops::Range, str::Chars};
 use codespan_reporting::diagnostic::Diagnostic;
 
 use crate::codespan_reporting::diagnostic::Label;
-use crate::context::{Printable, Printer};
-use crate::interner::{StringID, StringInterner};
+use crate::context::{Printable, Printer, StringID};
+use crate::interner::StringInterner;
 use crate::types::BuiltinType;
 use std::io;
 use std::io::Write;
@@ -144,11 +144,11 @@ struct Lexer<'a> {
     /// The end position of the current token
     end: usize,
     /// The interner for strings we encounter
-    interner: &'a mut StringInterner,
+    interner: &'a mut StringInterner<'a>,
 }
 
 impl<'a> Lexer<'a> {
-    fn new(input: &'a str, interner: &'a mut StringInterner) -> Self {
+    fn new(input: &'a str, interner: &'a mut StringInterner<'a>) -> Self {
         Lexer {
             chars: input.chars().peekable(),
             start: 0,
@@ -262,7 +262,7 @@ impl<'a> Iterator for Lexer<'a> {
 /// and yielding tokens.
 pub fn lex<'a>(
     input: &'a str,
-    interner: &'a mut StringInterner,
+    interner: &'a mut StringInterner<'a>,
 ) -> impl Iterator<Item = Result<Token, Error>> + 'a {
     Lexer::new(input, interner)
 }
