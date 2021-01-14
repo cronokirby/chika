@@ -21,16 +21,14 @@ use crate::context::{Context, StringID};
 /// assert_ne!(id1, id2);
 /// ```
 #[derive(Debug)]
-pub struct StringInterner<'a> {
-    ctx: &'a mut Context,
+pub struct StringInterner {
     ids: HashMap<String, StringID>,
 }
 
-impl<'a> StringInterner<'a> {
+impl StringInterner {
     /// Create a new interner, with no state whatsoever.
-    pub fn new(ctx: &'a mut Context) -> Self {
+    pub fn new() -> Self {
         Self {
-            ctx,
             ids: HashMap::new(),
         }
     }
@@ -39,11 +37,11 @@ impl<'a> StringInterner<'a> {
     ///
     /// Two different strings map to two different IDs, and the same string
     /// will map to the same ID.
-    pub fn intern(&mut self, string: String) -> StringID {
+    pub fn intern(&mut self, ctx: &mut Context, string: String) -> StringID {
         if let Some(&id) = self.ids.get(&string) {
             return id;
         }
-        let id = self.ctx.add_string(string.clone());
+        let id = ctx.add_string(string.clone());
         self.ids.insert(string, id);
         id
     }
@@ -56,27 +54,27 @@ mod test {
     #[test]
     fn adding_two_strings_gives_different_ids() {
         let mut ctx = Context::empty();
-        let mut interner = StringInterner::new(&mut ctx);
-        let id1 = interner.intern("A".into());
-        let id2 = interner.intern("B".into());
+        let mut interner = StringInterner::new();
+        let id1 = interner.intern(&mut ctx, "A".into());
+        let id2 = interner.intern(&mut ctx, "B".into());
         assert_ne!(id1, id2);
     }
 
     #[test]
     fn adding_same_string_gives_same_ids() {
         let mut ctx = Context::empty();
-        let mut interner = StringInterner::new(&mut ctx);
-        let id1 = interner.intern("A".into());
-        let id2 = interner.intern("A".into());
+        let mut interner = StringInterner::new();
+        let id1 = interner.intern(&mut ctx, "A".into());
+        let id2 = interner.intern(&mut ctx, "A".into());
         assert_eq!(id1, id2);
     }
 
     #[test]
     fn making_table_uses_interned_strings() {
         let mut ctx = Context::empty();
-        let mut interner = StringInterner::new(&mut ctx);
-        let id1 = interner.intern("A".into());
-        let id2 = interner.intern("B".into());
+        let mut interner = StringInterner::new();
+        let id1 = interner.intern(&mut ctx, "A".into());
+        let id2 = interner.intern(&mut ctx, "B".into());
         assert_eq!(ctx.get_string(id1), "A");
         assert_eq!(ctx.get_string(id2), "B");
     }

@@ -2,7 +2,7 @@ use std::{iter::Peekable, ops::Range, str::Chars};
 
 use codespan_reporting::diagnostic::Diagnostic;
 
-use crate::context::{Printable, Printer, StringID};
+use crate::context::{Context, Printable, Printer, StringID};
 use crate::interner::StringInterner;
 use crate::types::BuiltinType;
 use crate::{codespan_reporting::diagnostic::Label, context::FileID};
@@ -142,26 +142,26 @@ impl Printable for Error {
 /// A lexer uses a stream of characters to yield tokens
 #[derive(Debug)]
 struct Lexer<'a> {
+    /// The compilation context we're using
+    ctx: &'a mut Context,
     /// An iterator of characters we can peek
     chars: Peekable<Chars<'a>>,
-    /// The file being lexed
-    file: FileID,
     /// The start position of the current token
     start: usize,
     /// The end position of the current token
     end: usize,
     /// The interner for strings we encounter
-    interner: &'a mut StringInterner<'a>,
+    interner: StringInterner,
 }
 
 impl<'a> Lexer<'a> {
-    fn new(input: &'a str, file: FileID, interner: &'a mut StringInterner<'a>) -> Self {
+    fn new(input: &'a str, ctx: &'a mut Context) -> Self {
         Lexer {
             chars: input.chars().peekable(),
-            file,
+            ctx,
             start: 0,
             end: 0,
-            interner,
+            interner: StringInterner::new(),
         }
     }
 
@@ -253,12 +253,12 @@ impl<'a> Iterator for Lexer<'a> {
                     "fn" => Fn,
                     "return" => Return,
                     "var" => Var,
-                    _ => VarName(self.interner.intern(ident)),
+                    _ => VarName(self.interner.intern(&mut self.ctx, ident)),
                 }
             }
             c => {
                 return Some(Err(
-                    ErrorType::UnexpectedChar(c).at(self.file, self.start..self.end)
+                    ErrorType::UnexpectedChar(c).at(self.ctx.main_file, self.start..self.end)
                 ))
             }
         };
@@ -274,8 +274,7 @@ impl<'a> Iterator for Lexer<'a> {
 /// and yielding tokens.
 pub fn lex<'a>(
     input: &'a str,
-    file: FileID,
-    interner: &'a mut StringInterner<'a>,
+    ctx: &'a mut Context,
 ) -> impl Iterator<Item = Result<Token, Error>> + 'a {
-    Lexer::new(input, file, interner)
+    Lexer::new(input, ctx)
 }

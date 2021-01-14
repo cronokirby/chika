@@ -59,19 +59,17 @@ enum Command {
 fn lex(input_file: &Path, debug: bool) -> io::Result<()> {
     let mut ctx = Context::with_main_file(input_file)?;
 
-    // TODO: Avoid copy here
-    let main_file = ctx.main_file;
-    let source = ctx.source(main_file).unwrap().to_string();
-    let mut interner = interner::StringInterner::new(&mut ctx);
-
     let mut tokens = Vec::<lexer::Token>::new();
     let mut errors = Vec::<lexer::Error>::new();
-    for res in lexer::lex(&source, main_file, &mut interner) {
+
+    let source = ctx.source(ctx.main_file).unwrap().to_string();
+    for res in lexer::lex(&source, &mut ctx) {
         match res {
             Ok(tok) => tokens.push(tok),
             Err(e) => errors.push(e),
         }
     }
+
     if !errors.is_empty() {
         let mut out = StandardStream::stderr(ColorChoice::Always);
         let mut printer = context::Printer::new(&mut out, &ctx);
