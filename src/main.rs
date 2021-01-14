@@ -5,7 +5,6 @@ mod types;
 
 use context::{Context, Printable};
 
-use std::fs;
 use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
