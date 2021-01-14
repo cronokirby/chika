@@ -55,7 +55,7 @@ mod test {
 
     #[test]
     fn adding_two_strings_gives_different_ids() {
-        let mut ctx = Context::new();
+        let mut ctx = Context::empty();
         let mut interner = StringInterner::new(&mut ctx);
         let id1 = interner.intern("A".into());
         let id2 = interner.intern("B".into());
@@ -64,7 +64,7 @@ mod test {
 
     #[test]
     fn adding_same_string_gives_same_ids() {
-        let mut ctx = Context::new();
+        let mut ctx = Context::empty();
         let mut interner = StringInterner::new(&mut ctx);
         let id1 = interner.intern("A".into());
         let id2 = interner.intern("A".into());
@@ -73,7 +73,7 @@ mod test {
 
     #[test]
     fn making_table_uses_interned_strings() {
-        let mut ctx = Context::new();
+        let mut ctx = Context::empty();
         let mut interner = StringInterner::new(&mut ctx);
         let id1 = interner.intern("A".into());
         let id2 = interner.intern("B".into());

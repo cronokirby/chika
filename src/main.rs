@@ -14,7 +14,7 @@ use structopt::StructOpt;
 extern crate codespan_reporting;
 
 use codespan_reporting::term::termcolor::{Color, ColorSpec, StandardStream, WriteColor};
-use codespan_reporting::{files::SimpleFile, term::termcolor::ColorChoice};
+use codespan_reporting::{files::Files, term::termcolor::ColorChoice};
 
 /// A command that our CLI can process.
 #[derive(Debug, StructOpt)]
@@ -58,16 +58,16 @@ enum Command {
 }
 
 fn lex(input_file: &Path, debug: bool) -> io::Result<()> {
-    let mut ctx = Context::new();
+    let mut ctx = Context::with_main_file(input_file)?;
 
-    let input = fs::read_to_string(&input_file)?;
-    let file_name = input_file.to_string_lossy().to_string();
-    let simple_file = SimpleFile::new(file_name, input);
+    // TODO: Avoid copy here
+    let main_file = ctx.main_file;
+    let source = ctx.source(main_file).unwrap().to_string();
     let mut interner = interner::StringInterner::new(&mut ctx);
 
     let mut tokens = Vec::<lexer::Token>::new();
     let mut errors = Vec::<lexer::Error>::new();
-    for res in lexer::lex(simple_file.source(), &mut interner) {
+    for res in lexer::lex(&source, main_file, &mut interner) {
         match res {
             Ok(tok) => tokens.push(tok),
             Err(e) => errors.push(e),
@@ -75,7 +75,7 @@ fn lex(input_file: &Path, debug: bool) -> io::Result<()> {
     }
     if !errors.is_empty() {
         let mut out = StandardStream::stderr(ColorChoice::Always);
-        let mut printer = context::Printer::new(&mut out, &ctx, &simple_file);
+        let mut printer = context::Printer::new(&mut out, &ctx);
         printer.set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))?;
         writeln!(&mut printer, "Lexer Errors:\n")?;
         printer.reset()?;
@@ -87,10 +87,10 @@ fn lex(input_file: &Path, debug: bool) -> io::Result<()> {
         for t in tokens {
             println!("{:?}", t);
         }
-        println!("Contxt:\n{:?}", &ctx);
+        println!("Context:\n{:#?}", &ctx);
     } else {
         let mut stdout = StandardStream::stdout(ColorChoice::Always);
-        let mut printer = context::Printer::new(&mut stdout, &ctx, &simple_file);
+        let mut printer = context::Printer::new(&mut stdout, &ctx);
         writeln!(&mut printer, "Tokens:")?;
         for t in tokens {
             t.print(&mut printer)?;

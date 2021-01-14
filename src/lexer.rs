@@ -2,10 +2,10 @@ use std::{iter::Peekable, ops::Range, str::Chars};
 
 use codespan_reporting::diagnostic::Diagnostic;
 
-use crate::codespan_reporting::diagnostic::Label;
 use crate::context::{Printable, Printer, StringID};
 use crate::interner::StringInterner;
 use crate::types::BuiltinType;
+use crate::{codespan_reporting::diagnostic::Label, context::FileID};
 use std::io;
 use std::io::Write;
 
@@ -109,13 +109,18 @@ enum ErrorType {
 }
 
 impl ErrorType {
-    fn at(self, range: Range<usize>) -> Error {
-        Error { error: self, range }
+    fn at(self, file: FileID, range: Range<usize>) -> Error {
+        Error {
+            error: self,
+            file,
+            range,
+        }
     }
 }
 
 #[derive(Debug)]
 pub struct Error {
+    file: FileID,
     range: Range<usize>,
     error: ErrorType,
 }
@@ -127,7 +132,7 @@ impl Printable for Error {
         let diagnostic = match self.error {
             UnexpectedChar(c) => Diagnostic::error()
                 .with_message(format!("Unexpected Character: `{}`", c))
-                .with_labels(vec![Label::primary((), self.range.clone())]),
+                .with_labels(vec![Label::primary(self.file, self.range.clone())]),
         };
         printer.write_diagnostic(diagnostic);
         Ok(())
@@ -139,6 +144,8 @@ impl Printable for Error {
 struct Lexer<'a> {
     /// An iterator of characters we can peek
     chars: Peekable<Chars<'a>>,
+    /// The file being lexed
+    file: FileID,
     /// The start position of the current token
     start: usize,
     /// The end position of the current token
@@ -148,9 +155,10 @@ struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    fn new(input: &'a str, interner: &'a mut StringInterner<'a>) -> Self {
+    fn new(input: &'a str, file: FileID, interner: &'a mut StringInterner<'a>) -> Self {
         Lexer {
             chars: input.chars().peekable(),
+            file,
             start: 0,
             end: 0,
             interner,
@@ -248,7 +256,11 @@ impl<'a> Iterator for Lexer<'a> {
                     _ => VarName(self.interner.intern(ident)),
                 }
             }
-            c => return Some(Err(ErrorType::UnexpectedChar(c).at(self.start..self.end))),
+            c => {
+                return Some(Err(
+                    ErrorType::UnexpectedChar(c).at(self.file, self.start..self.end)
+                ))
+            }
         };
 
         let range = self.start..self.end;
@@ -262,7 +274,8 @@ impl<'a> Iterator for Lexer<'a> {
 /// and yielding tokens.
 pub fn lex<'a>(
     input: &'a str,
+    file: FileID,
     interner: &'a mut StringInterner<'a>,
 ) -> impl Iterator<Item = Result<Token, Error>> + 'a {
-    Lexer::new(input, interner)
+    Lexer::new(input, file, interner)
 }
