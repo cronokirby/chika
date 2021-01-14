@@ -1,11 +1,11 @@
 use std::io;
-use std::path::PathBuf;
 
 use codespan_reporting::files::SimpleFile;
 
 use crate::codespan_reporting::diagnostic::Diagnostic;
 use crate::codespan_reporting::term;
 use crate::interner::StringTable;
+use term::termcolor::ColorSpec;
 use term::termcolor::WriteColor;
 
 /// A struct that we can use to print the outputs of our compiler.
@@ -14,7 +14,7 @@ use term::termcolor::WriteColor;
 /// but also references a string table, so that we can print String IDs in a nice
 /// way for end-users.
 pub struct Printer<'a> {
-    pub buf: &'a mut dyn WriteColor,
+    buf: &'a mut dyn WriteColor,
     pub table: &'a StringTable,
     files: &'a SimpleFile<String, String>,
 }
@@ -42,6 +42,20 @@ impl<'a> io::Write for Printer<'a> {
 
     fn flush(&mut self) -> io::Result<()> {
         self.buf.flush()
+    }
+}
+
+impl<'a> WriteColor for Printer<'a> {
+    fn supports_color(&self) -> bool {
+        self.buf.supports_color()
+    }
+
+    fn set_color(&mut self, spec: &ColorSpec) -> io::Result<()> {
+        self.buf.set_color(spec)
+    }
+
+    fn reset(&mut self) -> io::Result<()> {
+        self.buf.reset()
     }
 }
 

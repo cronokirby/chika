@@ -1,6 +1,6 @@
+mod context;
 mod interner;
 mod lexer;
-mod context;
 mod types;
 
 use context::Printable;
@@ -13,7 +13,7 @@ use structopt::StructOpt;
 
 extern crate codespan_reporting;
 
-use codespan_reporting::term::termcolor::{Color, ColorSpec, StandardStream};
+use codespan_reporting::term::termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 use codespan_reporting::{files::SimpleFile, term::termcolor::ColorChoice};
 
 /// A command that our CLI can process.
@@ -75,12 +75,9 @@ fn lex(input_file: &Path, debug: bool) -> io::Result<()> {
         let table = interner.make_table();
         let mut out = StandardStream::stderr(ColorChoice::Always);
         let mut printer = context::Printer::new(&mut out, &table, &simple_file);
-        printer
-            .buf
-            .set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))
-            .unwrap();
+        printer.set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))?;
         writeln!(&mut printer, "Lexer Errors:\n")?;
-        printer.buf.reset().unwrap();
+        printer.reset()?;
         for e in errors {
             e.print(&mut printer)?;
         }
