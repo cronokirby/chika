@@ -3,8 +3,8 @@ use std::{iter::Peekable, ops::Range, str::Chars};
 use codespan_reporting::diagnostic::Diagnostic;
 
 use crate::codespan_reporting::diagnostic::Label;
-use crate::interner::{StringID, StringInterner};
 use crate::context::{Printable, Printer};
+use crate::interner::{StringID, StringInterner};
 use crate::types::BuiltinType;
 use std::io;
 use std::io::Write;
@@ -71,7 +71,7 @@ impl Printable for TokenType {
             Return => write!(printer, "return"),
             Var => write!(printer, "var"),
             IntLit(i) => write!(printer, "{}", i),
-            VarName(id) => write!(printer, "{}", &printer.table[id]),
+            VarName(id) => write!(printer, "{}", printer.ctx.get_string(id)),
             BuiltinTypeName(b) => b.print(printer),
         }
     }

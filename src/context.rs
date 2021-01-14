@@ -4,9 +4,28 @@ use codespan_reporting::files::SimpleFile;
 
 use crate::codespan_reporting::diagnostic::Diagnostic;
 use crate::codespan_reporting::term;
-use crate::interner::StringTable;
+use crate::interner::{StringID, StringTable};
 use term::termcolor::ColorSpec;
 use term::termcolor::WriteColor;
+
+pub struct Context {
+    table: Option<StringTable>,
+}
+
+impl Context {
+    pub fn new() -> Self {
+        Context { table: None }
+    }
+
+    pub fn set_table(&mut self, table: StringTable) {
+        self.table = Some(table)
+    }
+
+    pub fn get_string(&self, id: StringID) -> &str {
+        let table = self.table.as_ref().expect("empty string table");
+        &table[id]
+    }
+}
 
 /// A struct that we can use to print the outputs of our compiler.
 ///
@@ -15,7 +34,7 @@ use term::termcolor::WriteColor;
 /// way for end-users.
 pub struct Printer<'a> {
     buf: &'a mut dyn WriteColor,
-    pub table: &'a StringTable,
+    pub ctx: &'a Context,
     files: &'a SimpleFile<String, String>,
 }
 
@@ -23,10 +42,10 @@ impl<'a> Printer<'a> {
     /// Create a new printer from an output buffer and a table
     pub fn new(
         buf: &'a mut dyn WriteColor,
-        table: &'a StringTable,
+        ctx: &'a Context,
         files: &'a SimpleFile<String, String>,
     ) -> Self {
-        Self { buf, table, files }
+        Self { buf, ctx, files }
     }
 
     pub fn write_diagnostic(&mut self, diagnostic: Diagnostic<()>) {

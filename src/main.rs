@@ -3,7 +3,7 @@ mod interner;
 mod lexer;
 mod types;
 
-use context::Printable;
+use context::{Context, Printable};
 
 use std::fs;
 use std::io;
@@ -58,6 +58,8 @@ enum Command {
 }
 
 fn lex(input_file: &Path, debug: bool) -> io::Result<()> {
+    let mut ctx = Context::new();
+
     let input = fs::read_to_string(&input_file)?;
     let file_name = input_file.to_string_lossy().to_string();
     let simple_file = SimpleFile::new(file_name, input);
@@ -72,9 +74,9 @@ fn lex(input_file: &Path, debug: bool) -> io::Result<()> {
         }
     }
     if !errors.is_empty() {
-        let table = interner.make_table();
+        ctx.set_table(interner.make_table());
         let mut out = StandardStream::stderr(ColorChoice::Always);
-        let mut printer = context::Printer::new(&mut out, &table, &simple_file);
+        let mut printer = context::Printer::new(&mut out, &ctx, &simple_file);
         printer.set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))?;
         writeln!(&mut printer, "Lexer Errors:\n")?;
         printer.reset()?;
@@ -89,9 +91,9 @@ fn lex(input_file: &Path, debug: bool) -> io::Result<()> {
         }
         println!("Table:\n{:?}", &table);
     } else {
-        let table = interner.make_table();
+        ctx.set_table(interner.make_table());
         let mut stdout = StandardStream::stdout(ColorChoice::Always);
-        let mut printer = context::Printer::new(&mut stdout, &table, &simple_file);
+        let mut printer = context::Printer::new(&mut stdout, &ctx, &simple_file);
         writeln!(&mut printer, "Tokens:")?;
         for t in tokens {
             t.print(&mut printer)?;
