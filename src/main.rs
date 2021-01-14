@@ -1,9 +1,9 @@
 mod interner;
 mod lexer;
-mod presentation;
+mod context;
 mod types;
 
-use presentation::Printable;
+use context::Printable;
 
 use std::fs;
 use std::io;
@@ -74,7 +74,7 @@ fn lex(input_file: &Path, debug: bool) -> io::Result<()> {
     if !errors.is_empty() {
         let table = interner.make_table();
         let mut out = StandardStream::stderr(ColorChoice::Always);
-        let mut printer = presentation::Printer::new(&mut out, &table, &simple_file);
+        let mut printer = context::Printer::new(&mut out, &table, &simple_file);
         printer
             .buf
             .set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))
@@ -94,7 +94,7 @@ fn lex(input_file: &Path, debug: bool) -> io::Result<()> {
     } else {
         let table = interner.make_table();
         let mut stdout = StandardStream::stdout(ColorChoice::Always);
-        let mut printer = presentation::Printer::new(&mut stdout, &table, &simple_file);
+        let mut printer = context::Printer::new(&mut stdout, &table, &simple_file);
         writeln!(&mut printer, "Tokens:")?;
         for t in tokens {
             t.print(&mut printer)?;

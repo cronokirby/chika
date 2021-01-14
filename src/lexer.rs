@@ -4,7 +4,7 @@ use codespan_reporting::diagnostic::Diagnostic;
 
 use crate::codespan_reporting::diagnostic::Label;
 use crate::interner::{StringID, StringInterner};
-use crate::presentation::{Printable, Printer};
+use crate::context::{Printable, Printer};
 use crate::types::BuiltinType;
 use std::io;
 use std::io::Write;

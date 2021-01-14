@@ -1,4 +1,5 @@
 use std::io;
+use std::path::PathBuf;
 
 use codespan_reporting::files::SimpleFile;
 
