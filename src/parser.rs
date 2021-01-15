@@ -1,6 +1,9 @@
 use std::rc::Rc;
 
-use crate::context::{Location, StringID};
+use crate::{
+    context::{Location, StringID},
+    types::BuiltinType,
+};
 
 /// Represents the kind of shape that a node can have.
 ///
@@ -12,6 +15,8 @@ enum NodeShape {
     String(StringID),
     /// This node is a terminal reference to an integer
     IntLit(u32),
+    /// This node is a termainl reference to a builtin type
+    Type(BuiltinType),
     /// This node branches off to contain other nodes
     Branch(Vec<Rc<Node>>),
 }
@@ -41,6 +46,13 @@ impl Node {
         match &self.shape {
             NodeShape::IntLit(v) => *v,
             other => panic!("expected int lit, found: {:?}", other),
+        }
+    }
+
+    fn typ(&self) -> BuiltinType {
+        match &self.shape {
+            NodeShape::Type(t) => *t,
+            other => panic!("expected type, found: {:?}", other),
         }
     }
 
