@@ -200,3 +200,19 @@ impl<'a> WriteColor for Printer<'a> {
 pub trait Printable {
     fn print<'a>(&self, printer: &mut Printer<'a>) -> errors::Result<()>;
 }
+
+/// A location of some item in the source code
+#[derive(Debug)]
+pub struct Location {
+    /// The file this snippet originates from
+    pub file: FileID,
+    /// The range in bytes that this snippet occupies
+    pub range: Range<usize>,
+}
+
+impl Location {
+    /// Create a new location, from a file, and a range of bytes
+    pub fn new(file: FileID, range: Range<usize>) -> Self {
+        Location { file, range }
+    }
+}
