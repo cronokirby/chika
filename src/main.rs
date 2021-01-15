@@ -2,6 +2,7 @@ mod context;
 mod errors;
 mod interner;
 mod lexer;
+mod parser;
 mod types;
 
 use context::{Context, Printable};
