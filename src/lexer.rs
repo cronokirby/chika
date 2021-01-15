@@ -168,7 +168,7 @@ impl<'a> Lexer<'a> {
 
     fn next_char(&mut self) -> Option<char> {
         let next = self.chars.next();
-        if let Some(c) = next{
+        if let Some(c) = next {
             self.end += c.len_utf8();
         }
         next
@@ -278,4 +278,49 @@ pub fn lex<'a>(
     ctx: &'a mut Context,
 ) -> impl Iterator<Item = Result<Token, Error>> + 'a {
     Lexer::new(input, ctx)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn get_errors(input: &str) -> Vec<Error> {
+        let mut errors = Vec::new();
+        for res in Lexer::new(input, &mut Context::empty()) {
+            if let Err(e) = res {
+                errors.push(e);
+            }
+        }
+        errors
+    }
+
+    fn should_lex(input: &str) {
+        let errors = get_errors(input);
+        assert!(errors.is_empty(), "errors = {:?}", errors);
+    }
+
+    fn should_not_lex(input: &str) {
+        let errors = get_errors(input);
+        assert!(!errors.is_empty(), "errors = {:?}", errors);
+    }
+
+    #[test]
+    fn basic_operators_lex() {
+        should_lex("+ / * - () ; : {}");
+    }
+
+    #[test]
+    fn identifiers_lex() {
+        should_lex("a b foo地3 a34 I32 Unit");
+    }
+
+    #[test]
+    fn literals_lex() {
+        should_lex("23 2343 1234567890");
+    }
+
+    #[test]
+    fn unknown_characters_fail() {
+        should_not_lex("² ΅ ´");
+    }
 }
