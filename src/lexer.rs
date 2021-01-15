@@ -2,7 +2,7 @@ use std::{iter::Peekable, ops::Range, str::Chars};
 
 use codespan_reporting::diagnostic::Diagnostic;
 
-use crate::context::{Context, Printable, Printer, StringID};
+use crate::context::{Context, Location, Printable, Printer, StringID};
 use crate::errors;
 use crate::interner::StringInterner;
 use crate::types::BuiltinType;
@@ -114,16 +114,14 @@ impl ErrorType {
     fn at(self, file: FileID, range: Range<usize>) -> Error {
         Error {
             error: self,
-            file,
-            range,
+            location: Location::new(file, range),
         }
     }
 }
 
 #[derive(Debug)]
 pub struct Error {
-    file: FileID,
-    range: Range<usize>,
+    location: Location,
     error: ErrorType,
 }
 
@@ -134,7 +132,10 @@ impl Printable for Error {
         let diagnostic = match self.error {
             UnexpectedChar(c) => Diagnostic::error()
                 .with_message(format!("Unexpected Character: `{}`", c))
-                .with_labels(vec![Label::primary(self.file, self.range.clone())]),
+                .with_labels(vec![Label::primary(
+                    self.location.file,
+                    self.location.range.clone(),
+                )]),
         };
         printer.write_diagnostic(diagnostic)
     }
