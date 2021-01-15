@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::context::{Location, StringID};
 
 /// Represents the kind of shape that a node can have.
@@ -11,7 +13,7 @@ enum NodeShape {
     /// This node is a terminal reference to an integer
     IntLit(u32),
     /// This node branches off to contain other nodes
-    Branch(Vec<Node>),
+    Branch(Vec<Rc<Node>>),
 }
 
 /// Represents a single raw Node in our AST.
@@ -42,7 +44,7 @@ impl Node {
         }
     }
 
-    fn branch(&self) -> &[Node] {
+    fn branch(&self) -> &[Rc<Node>] {
         match &self.shape {
             NodeShape::Branch(v) => v,
             other => panic!("expected branch, found: {:?}", other),
