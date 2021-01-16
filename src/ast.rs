@@ -86,6 +86,10 @@ impl Node {
     }
 }
 
+trait HasLocation {
+    fn location(&self) -> &Location;
+}
+
 #[derive(Debug)]
 pub enum ExprKind {
     IntLitExpr(IntLitExpr),
@@ -110,6 +114,12 @@ impl Expr {
     }
 }
 
+impl HasLocation for Expr {
+    fn location(&self) -> &Location {
+        &self.0.location
+    }
+}
+
 #[derive(Debug)]
 pub struct IntLitExpr(Rc<Node>);
 
@@ -125,6 +135,12 @@ impl Into<ExprKind> for IntLitExpr {
     }
 }
 
+impl HasLocation for IntLitExpr {
+    fn location(&self) -> &Location {
+        &self.0.location
+    }
+}
+
 #[derive(Debug)]
 pub struct VarExpr(Rc<Node>);
 
@@ -137,6 +153,12 @@ impl VarExpr {
 impl Into<ExprKind> for VarExpr {
     fn into(self) -> ExprKind {
         ExprKind::VarExpr(self)
+    }
+}
+
+impl HasLocation for VarExpr {
+    fn location(&self) -> &Location {
+        &self.0.location
     }
 }
 
@@ -198,6 +220,12 @@ impl Into<ExprKind> for BinExpr {
     }
 }
 
+impl HasLocation for BinExpr {
+    fn location(&self) -> &Location {
+        &self.node.location
+    }
+}
+
 enum StatementKind {
     ReturnStatement(ReturnStatement),
     VarStatement(VarStatement),
@@ -222,6 +250,12 @@ impl Statement {
     }
 }
 
+impl HasLocation for Statement {
+    fn location(&self) -> &Location {
+        &self.0.location
+    }
+}
+
 struct ReturnStatement(Rc<Node>);
 
 impl ReturnStatement {
@@ -233,6 +267,12 @@ impl ReturnStatement {
 impl Into<StatementKind> for ReturnStatement {
     fn into(self) -> StatementKind {
         StatementKind::ReturnStatement(self)
+    }
+}
+
+impl HasLocation for ReturnStatement {
+    fn location(&self) -> &Location {
+        &self.0.location
     }
 }
 
@@ -258,6 +298,12 @@ impl Into<StatementKind> for VarStatement {
     }
 }
 
+impl HasLocation for VarStatement {
+    fn location(&self) -> &Location {
+        &self.0.location
+    }
+}
+
 struct BlockStatement(Rc<Node>);
 
 impl BlockStatement {
@@ -267,6 +313,12 @@ impl BlockStatement {
 
     fn statement(&self, i: usize) -> Statement {
         Statement(self.0.branch()[i].clone())
+    }
+}
+
+impl HasLocation for BlockStatement {
+    fn location(&self) -> &Location {
+        &self.0.location
     }
 }
 
@@ -309,6 +361,12 @@ impl Into<StatementKind> for IfStatement {
     }
 }
 
+impl HasLocation for IfStatement {
+    fn location(&self) -> &Location {
+        &self.node.location
+    }
+}
+
 struct ExprStatement(Rc<Node>);
 
 impl ExprStatement {
@@ -320,6 +378,12 @@ impl ExprStatement {
 impl Into<StatementKind> for ExprStatement {
     fn into(self) -> StatementKind {
         StatementKind::ExprStatement(self)
+    }
+}
+
+impl HasLocation for ExprStatement {
+    fn location(&self) -> &Location {
+        &self.0.location
     }
 }
 
@@ -347,5 +411,11 @@ impl Function {
         let string = self.0.branch()[j].string();
         let typ = self.0.branch()[j + 1].typ();
         (string, typ)
+    }
+}
+
+impl HasLocation for Function {
+    fn location(&self) -> &Location {
+        &self.0.location
     }
 }
