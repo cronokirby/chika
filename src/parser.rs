@@ -15,6 +15,13 @@ enum Tag {
     BinExprDiv,
     VarExpr,
     Expr,
+    ReturnStatement,
+    VarStatement,
+    IfStatement,
+    IfElseStatement,
+    ExprStatement,
+    BlockStatement,
+    Statement,
 }
 
 /// Represents the kind of shape that a node can have.
@@ -187,5 +194,130 @@ impl BinExpr {
 impl Into<ExprKind> for BinExpr {
     fn into(self) -> ExprKind {
         ExprKind::BinExpr(self)
+    }
+}
+
+enum StatementKind {
+    ReturnStatement(ReturnStatement),
+    VarStatement(VarStatement),
+    BlockStatement(BlockStatement),
+    IfStatement(IfStatement),
+    ExprStatement(ExprStatement),
+}
+
+struct Statement(Rc<Node>);
+
+impl Statement {
+    fn kind(&self) -> StatementKind {
+        match &self.0.tag {
+            Tag::ReturnStatement => ReturnStatement(self.0.clone()).into(),
+            Tag::VarStatement => VarStatement(self.0.clone()).into(),
+            Tag::BlockStatement => BlockStatement(self.0.clone()).into(),
+            Tag::IfStatement => IfStatement::new(false, self.0.clone()).into(),
+            Tag::IfElseStatement => IfStatement::new(false, self.0.clone()).into(),
+            Tag::ExprStatement => ExprStatement(self.0.clone()).into(),
+            other => panic!("unexpected tag {:?}", other),
+        }
+    }
+}
+
+struct ReturnStatement(Rc<Node>);
+
+impl ReturnStatement {
+    fn expr(&self) -> Expr {
+        Expr(self.0.branch()[0].clone())
+    }
+}
+
+impl Into<StatementKind> for ReturnStatement {
+    fn into(self) -> StatementKind {
+        StatementKind::ReturnStatement(self)
+    }
+}
+
+struct VarStatement(Rc<Node>);
+
+impl VarStatement {
+    fn var(&self) -> StringID {
+        self.0.branch()[0].string()
+    }
+
+    fn typ(&self) -> BuiltinType {
+        self.0.branch()[1].typ()
+    }
+
+    fn expr(&self) -> Expr {
+        Expr(self.0.branch()[0].clone())
+    }
+}
+
+impl Into<StatementKind> for VarStatement {
+    fn into(self) -> StatementKind {
+        StatementKind::VarStatement(self)
+    }
+}
+
+struct BlockStatement(Rc<Node>);
+
+impl BlockStatement {
+    fn len(&self) -> usize {
+        self.0.branch().len()
+    }
+
+    fn statement(&self, i: usize) -> Statement {
+        Statement(self.0.branch()[i].clone())
+    }
+}
+
+impl Into<StatementKind> for BlockStatement {
+    fn into(self) -> StatementKind {
+        StatementKind::BlockStatement(self)
+    }
+}
+
+struct IfStatement {
+    has_else: bool,
+    node: Rc<Node>,
+}
+
+impl IfStatement {
+    fn new(has_else: bool, node: Rc<Node>) -> Self {
+        IfStatement { has_else, node }
+    }
+
+    fn cond(&self) -> Expr {
+        Expr(self.node.branch()[0].clone())
+    }
+
+    fn if_branch(&self) -> Statement {
+        Statement(self.node.branch()[1].clone())
+    }
+
+    fn else_branch(&self) -> Option<Statement> {
+        if self.has_else {
+            Some(Statement(self.node.branch()[2].clone()))
+        } else {
+            None
+        }
+    }
+}
+
+impl Into<StatementKind> for IfStatement {
+    fn into(self) -> StatementKind {
+        StatementKind::IfStatement(self)
+    }
+}
+
+struct ExprStatement(Rc<Node>);
+
+impl ExprStatement {
+    fn expr(&self) -> Expr {
+        Expr(self.0.branch()[0].clone())
+    }
+}
+
+impl Into<StatementKind> for ExprStatement {
+    fn into(self) -> StatementKind {
+        StatementKind::ExprStatement(self)
     }
 }
