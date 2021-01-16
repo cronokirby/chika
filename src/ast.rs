@@ -5,6 +5,9 @@ use crate::{
     types::BuiltinType,
 };
 
+/// This is used to differentiatate different kinds of raw nodes.
+///
+/// When creating a raw node, we always attach the correct tag.
 #[derive(Debug)]
 #[repr(u8)]
 enum Tag {
@@ -86,10 +89,12 @@ impl Node {
     }
 }
 
-trait HasLocation {
+/// A trait allowing us to query the location of some AST node.
+pub trait HasLocation {
     fn location(&self) -> &Location;
 }
 
+// We use this macro, since every ast type has an easily accessible underlying node
 macro_rules! impl_has_location {
     ($x:ident) => {
         impl HasLocation for $x {
@@ -107,6 +112,7 @@ macro_rules! impl_has_location {
     };
 }
 
+// We use this macro, since we have this kind of variant pattern so often
 macro_rules! impl_variant {
     ($typ:ident, $variant:ident) => {
         impl Into<$typ> for $variant {
@@ -117,18 +123,24 @@ macro_rules! impl_variant {
     };
 }
 
+/// Represents a strongly typed enumeration of expressions.
 #[derive(Debug)]
 pub enum ExprKind {
+    /// An single int as an expression
     IntLitExpr(IntLitExpr),
+    /// A single variable as an expression
     VarExpr(VarExpr),
+    /// Binary arithmetic, as an expression
     BinExpr(BinExpr),
 }
 
+/// Represents a generic kind of expression
 #[derive(Debug)]
 pub struct Expr(Rc<Node>);
 
 impl Expr {
-    fn kind(&self) -> ExprKind {
+    /// Get a strongly typed variant from this expression
+    pub fn kind(&self) -> ExprKind {
         match &self.0.tag {
             Tag::VarExpr => VarExpr(self.0.clone()).into(),
             Tag::IntLitExpr => IntLitExpr(self.0.clone()).into(),
@@ -143,10 +155,12 @@ impl Expr {
 
 impl_has_location!(Expr);
 
+/// An integer literal, used as an expression
 #[derive(Debug)]
 pub struct IntLitExpr(Rc<Node>);
 
 impl IntLitExpr {
+    /// The underlying integer composing this expression
     pub fn int_lit(&self) -> u32 {
         self.0.int_lit()
     }
@@ -155,10 +169,12 @@ impl IntLitExpr {
 impl_variant!(ExprKind, IntLitExpr);
 impl_has_location!(IntLitExpr);
 
+/// A reference to a variable, used as an expression
 #[derive(Debug)]
 pub struct VarExpr(Rc<Node>);
 
 impl VarExpr {
+    /// The string that composes this variable name
     pub fn var(&self) -> StringID {
         self.0.string()
     }
@@ -167,16 +183,23 @@ impl VarExpr {
 impl_variant!(ExprKind, VarExpr);
 impl_has_location!(VarExpr);
 
+/// The kind of binary operation we're using
 #[derive(Clone, Copy, Debug)]
 pub enum BinOp {
+    /// Add two integers together
     Add,
+    /// Multiply two integers
     Mul,
+    /// Subtract two integers
     Sub,
+    /// Divide two integers
     Div,
 }
 
+/// An expression applying a binary operator to two expressions
 #[derive(Debug)]
 pub struct BinExpr {
+    /// The operator being used
     pub op: BinOp,
     node: Rc<Node>,
 }
@@ -210,11 +233,13 @@ impl BinExpr {
         }
     }
 
-    fn lhs(&self) -> Expr {
+    /// The left expression for this operator
+    pub fn lhs(&self) -> Expr {
         Expr(self.node.branch()[0].clone())
     }
 
-    fn rhs(&self) -> Expr {
+    /// The right expression for this operator
+    pub fn rhs(&self) -> Expr {
         Expr(self.node.branch()[1].clone())
     }
 }
@@ -222,15 +247,21 @@ impl BinExpr {
 impl_variant!(ExprKind, BinExpr);
 impl_has_location!(BinExpr, node);
 
-enum StatementKind {
+/// Represents a strongly typed kind of statement
+pub enum StatementKind {
+    /// A return statement
     ReturnStatement(ReturnStatement),
+    /// The creation of a new variable
     VarStatement(VarStatement),
+    /// A block containing multiple statements
     BlockStatement(BlockStatement),
+    /// An if statement, possibly containing an else
     IfStatement(IfStatement),
+    /// An expression, used as a statement
     ExprStatement(ExprStatement),
 }
 
-struct Statement(Rc<Node>);
+pub struct Statement(Rc<Node>);
 
 impl Statement {
     fn kind(&self) -> StatementKind {
@@ -248,10 +279,12 @@ impl Statement {
 
 impl_has_location!(Statement);
 
-struct ReturnStatement(Rc<Node>);
+/// A statement returning the value of some expression
+pub struct ReturnStatement(Rc<Node>);
 
 impl ReturnStatement {
-    fn expr(&self) -> Expr {
+    /// The underlying expression being returned
+    pub fn expr(&self) -> Expr {
         Expr(self.0.branch()[0].clone())
     }
 }
@@ -259,18 +292,22 @@ impl ReturnStatement {
 impl_variant!(StatementKind, ReturnStatement);
 impl_has_location!(ReturnStatement);
 
-struct VarStatement(Rc<Node>);
+/// A statement defining a new variable
+pub struct VarStatement(Rc<Node>);
 
 impl VarStatement {
-    fn var(&self) -> StringID {
+    /// The string of the variable being declared
+    pub fn var(&self) -> StringID {
         self.0.branch()[0].string()
     }
 
-    fn typ(&self) -> BuiltinType {
+    /// The type of the variable being declared
+    pub fn typ(&self) -> BuiltinType {
         self.0.branch()[1].typ()
     }
 
-    fn expr(&self) -> Expr {
+    /// The expression value for the variable
+    pub fn expr(&self) -> Expr {
         Expr(self.0.branch()[0].clone())
     }
 }
@@ -278,13 +315,16 @@ impl VarStatement {
 impl_variant!(StatementKind, VarStatement);
 impl_has_location!(VarStatement);
 
-struct BlockStatement(Rc<Node>);
+/// A block statement is composed of multiple statements together
+pub struct BlockStatement(Rc<Node>);
 
 impl BlockStatement {
-    fn len(&self) -> usize {
+    /// The number of statements in this block
+    pub fn len(&self) -> usize {
         self.0.branch().len()
     }
 
+    /// The ith statement in this block
     fn statement(&self, i: usize) -> Statement {
         Statement(self.0.branch()[i].clone())
     }
@@ -293,7 +333,10 @@ impl BlockStatement {
 impl_variant!(StatementKind, BlockStatement);
 impl_has_location!(BlockStatement);
 
-struct IfStatement {
+/// Represents a conditional statement.
+///
+/// We might have an optional else branch as well.
+pub struct IfStatement {
     has_else: bool,
     node: Rc<Node>,
 }
@@ -303,15 +346,18 @@ impl IfStatement {
         IfStatement { has_else, node }
     }
 
-    fn cond(&self) -> Expr {
+    /// The expression making up the condition of this statement
+    pub fn cond(&self) -> Expr {
         Expr(self.node.branch()[0].clone())
     }
 
-    fn if_branch(&self) -> Statement {
+    /// The branch to use when the condition holds
+    pub fn if_branch(&self) -> Statement {
         Statement(self.node.branch()[1].clone())
     }
 
-    fn else_branch(&self) -> Option<Statement> {
+    /// The branch to use when the condition fails
+    pub fn else_branch(&self) -> Option<Statement> {
         if self.has_else {
             Some(Statement(self.node.branch()[2].clone()))
         } else {
@@ -323,10 +369,15 @@ impl IfStatement {
 impl_variant!(StatementKind, IfStatement);
 impl_has_location!(IfStatement, node);
 
-struct ExprStatement(Rc<Node>);
+/// A statement evaluating an expression.
+///
+/// This might seem useless, but keep in mind that this may include function
+/// calls, and those side effects may be important.
+pub struct ExprStatement(Rc<Node>);
 
 impl ExprStatement {
-    fn expr(&self) -> Expr {
+    /// The expression making up this statement
+    pub fn expr(&self) -> Expr {
         Expr(self.0.branch()[0].clone())
     }
 }
@@ -334,25 +385,31 @@ impl ExprStatement {
 impl_variant!(StatementKind, ExprStatement);
 impl_has_location!(ExprStatement);
 
-struct Function(Rc<Node>);
+/// A definition of a new function
+pub struct Function(Rc<Node>);
 
 impl Function {
-    fn name(&self) -> StringID {
+    /// The name of this function, as a string
+    pub fn name(&self) -> StringID {
         self.0.branch()[0].string()
     }
 
-    fn return_type(&self) -> BuiltinType {
+    /// The return type for this function
+    pub fn return_type(&self) -> BuiltinType {
         self.0.branch()[1].typ()
     }
 
+    /// The body of this function
     fn body(&self) -> BlockStatement {
         BlockStatement(self.0.branch()[2].clone())
     }
 
+    /// The number of parameters to this function
     fn param_count(&self) -> usize {
         (self.0.branch().len() - 3) / 2
     }
 
+    /// The ith parameter to this function
     fn param(&self, i: usize) -> (StringID, BuiltinType) {
         let j = i - 3;
         let string = self.0.branch()[j].string();
