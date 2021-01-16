@@ -22,6 +22,7 @@ enum Tag {
     ExprStatement,
     BlockStatement,
     Statement,
+    Function,
 }
 
 /// Represents the kind of shape that a node can have.
@@ -319,5 +320,32 @@ impl ExprStatement {
 impl Into<StatementKind> for ExprStatement {
     fn into(self) -> StatementKind {
         StatementKind::ExprStatement(self)
+    }
+}
+
+struct Function(Rc<Node>);
+
+impl Function {
+    fn name(&self) -> StringID {
+        self.0.branch()[0].string()
+    }
+
+    fn return_type(&self) -> BuiltinType {
+        self.0.branch()[1].typ()
+    }
+
+    fn body(&self) -> BlockStatement {
+        BlockStatement(self.0.branch()[2].clone())
+    }
+
+    fn param_count(&self) -> usize {
+        (self.0.branch().len() - 3) / 2
+    }
+
+    fn param(&self, i: usize) -> (StringID, BuiltinType) {
+        let j = i - 3;
+        let string = self.0.branch()[j].string();
+        let typ = self.0.branch()[j + 1].typ();
+        (string, typ)
     }
 }
