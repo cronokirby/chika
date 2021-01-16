@@ -90,6 +90,23 @@ trait HasLocation {
     fn location(&self) -> &Location;
 }
 
+macro_rules! impl_has_location {
+    ($x:ident) => {
+        impl HasLocation for $x {
+            fn location(&self) -> &Location {
+                &self.0.location
+            }
+        }
+    };
+    ($x:ident, $y:ident) => {
+        impl HasLocation for $x {
+            fn location(&self) -> &Location {
+                &self.$y.location
+            }
+        }
+    };
+}
+
 #[derive(Debug)]
 pub enum ExprKind {
     IntLitExpr(IntLitExpr),
@@ -114,11 +131,7 @@ impl Expr {
     }
 }
 
-impl HasLocation for Expr {
-    fn location(&self) -> &Location {
-        &self.0.location
-    }
-}
+impl_has_location!(Expr);
 
 #[derive(Debug)]
 pub struct IntLitExpr(Rc<Node>);
@@ -135,11 +148,7 @@ impl Into<ExprKind> for IntLitExpr {
     }
 }
 
-impl HasLocation for IntLitExpr {
-    fn location(&self) -> &Location {
-        &self.0.location
-    }
-}
+impl_has_location!(IntLitExpr);
 
 #[derive(Debug)]
 pub struct VarExpr(Rc<Node>);
@@ -156,11 +165,7 @@ impl Into<ExprKind> for VarExpr {
     }
 }
 
-impl HasLocation for VarExpr {
-    fn location(&self) -> &Location {
-        &self.0.location
-    }
-}
+impl_has_location!(VarExpr);
 
 #[derive(Clone, Copy, Debug)]
 pub enum BinOp {
@@ -220,11 +225,7 @@ impl Into<ExprKind> for BinExpr {
     }
 }
 
-impl HasLocation for BinExpr {
-    fn location(&self) -> &Location {
-        &self.node.location
-    }
-}
+impl_has_location!(BinExpr, node);
 
 enum StatementKind {
     ReturnStatement(ReturnStatement),
@@ -250,11 +251,7 @@ impl Statement {
     }
 }
 
-impl HasLocation for Statement {
-    fn location(&self) -> &Location {
-        &self.0.location
-    }
-}
+impl_has_location!(Statement);
 
 struct ReturnStatement(Rc<Node>);
 
@@ -270,11 +267,7 @@ impl Into<StatementKind> for ReturnStatement {
     }
 }
 
-impl HasLocation for ReturnStatement {
-    fn location(&self) -> &Location {
-        &self.0.location
-    }
-}
+impl_has_location!(ReturnStatement);
 
 struct VarStatement(Rc<Node>);
 
@@ -298,11 +291,7 @@ impl Into<StatementKind> for VarStatement {
     }
 }
 
-impl HasLocation for VarStatement {
-    fn location(&self) -> &Location {
-        &self.0.location
-    }
-}
+impl_has_location!(VarStatement);
 
 struct BlockStatement(Rc<Node>);
 
@@ -316,17 +305,13 @@ impl BlockStatement {
     }
 }
 
-impl HasLocation for BlockStatement {
-    fn location(&self) -> &Location {
-        &self.0.location
-    }
-}
-
 impl Into<StatementKind> for BlockStatement {
     fn into(self) -> StatementKind {
         StatementKind::BlockStatement(self)
     }
 }
+
+impl_has_location!(BlockStatement);
 
 struct IfStatement {
     has_else: bool,
@@ -361,11 +346,7 @@ impl Into<StatementKind> for IfStatement {
     }
 }
 
-impl HasLocation for IfStatement {
-    fn location(&self) -> &Location {
-        &self.node.location
-    }
-}
+impl_has_location!(IfStatement, node);
 
 struct ExprStatement(Rc<Node>);
 
@@ -381,11 +362,7 @@ impl Into<StatementKind> for ExprStatement {
     }
 }
 
-impl HasLocation for ExprStatement {
-    fn location(&self) -> &Location {
-        &self.0.location
-    }
-}
+impl_has_location!(ExprStatement);
 
 struct Function(Rc<Node>);
 
@@ -414,8 +391,4 @@ impl Function {
     }
 }
 
-impl HasLocation for Function {
-    fn location(&self) -> &Location {
-        &self.0.location
-    }
-}
+impl_has_location!(Function);
