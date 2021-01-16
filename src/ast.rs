@@ -107,6 +107,16 @@ macro_rules! impl_has_location {
     };
 }
 
+macro_rules! impl_variant {
+    ($typ:ident, $variant:ident) => {
+        impl Into<$typ> for $variant {
+            fn into(self) -> $typ {
+                $typ::$variant(self)
+            }
+        }
+    };
+}
+
 #[derive(Debug)]
 pub enum ExprKind {
     IntLitExpr(IntLitExpr),
@@ -142,12 +152,7 @@ impl IntLitExpr {
     }
 }
 
-impl Into<ExprKind> for IntLitExpr {
-    fn into(self) -> ExprKind {
-        ExprKind::IntLitExpr(self)
-    }
-}
-
+impl_variant!(ExprKind, IntLitExpr);
 impl_has_location!(IntLitExpr);
 
 #[derive(Debug)]
@@ -159,12 +164,7 @@ impl VarExpr {
     }
 }
 
-impl Into<ExprKind> for VarExpr {
-    fn into(self) -> ExprKind {
-        ExprKind::VarExpr(self)
-    }
-}
-
+impl_variant!(ExprKind, VarExpr);
 impl_has_location!(VarExpr);
 
 #[derive(Clone, Copy, Debug)]
@@ -219,12 +219,7 @@ impl BinExpr {
     }
 }
 
-impl Into<ExprKind> for BinExpr {
-    fn into(self) -> ExprKind {
-        ExprKind::BinExpr(self)
-    }
-}
-
+impl_variant!(ExprKind, BinExpr);
 impl_has_location!(BinExpr, node);
 
 enum StatementKind {
@@ -261,12 +256,7 @@ impl ReturnStatement {
     }
 }
 
-impl Into<StatementKind> for ReturnStatement {
-    fn into(self) -> StatementKind {
-        StatementKind::ReturnStatement(self)
-    }
-}
-
+impl_variant!(StatementKind, ReturnStatement);
 impl_has_location!(ReturnStatement);
 
 struct VarStatement(Rc<Node>);
@@ -285,12 +275,7 @@ impl VarStatement {
     }
 }
 
-impl Into<StatementKind> for VarStatement {
-    fn into(self) -> StatementKind {
-        StatementKind::VarStatement(self)
-    }
-}
-
+impl_variant!(StatementKind, VarStatement);
 impl_has_location!(VarStatement);
 
 struct BlockStatement(Rc<Node>);
@@ -305,12 +290,7 @@ impl BlockStatement {
     }
 }
 
-impl Into<StatementKind> for BlockStatement {
-    fn into(self) -> StatementKind {
-        StatementKind::BlockStatement(self)
-    }
-}
-
+impl_variant!(StatementKind, BlockStatement);
 impl_has_location!(BlockStatement);
 
 struct IfStatement {
@@ -340,12 +320,7 @@ impl IfStatement {
     }
 }
 
-impl Into<StatementKind> for IfStatement {
-    fn into(self) -> StatementKind {
-        StatementKind::IfStatement(self)
-    }
-}
-
+impl_variant!(StatementKind, IfStatement);
 impl_has_location!(IfStatement, node);
 
 struct ExprStatement(Rc<Node>);
@@ -356,12 +331,7 @@ impl ExprStatement {
     }
 }
 
-impl Into<StatementKind> for ExprStatement {
-    fn into(self) -> StatementKind {
-        StatementKind::ExprStatement(self)
-    }
-}
-
+impl_variant!(StatementKind, ExprStatement);
 impl_has_location!(ExprStatement);
 
 struct Function(Rc<Node>);
