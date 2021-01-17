@@ -118,6 +118,10 @@ impl Context {
     fn get_file(&self, id: FileID) -> Result<&File, files::Error> {
         self.files.get(id.0).ok_or(files::Error::FileMissing)
     }
+
+    pub fn file_size(&self, id: FileID) -> Result<usize, files::Error> {
+        Ok(self.get_file(id)?.source.len())
+    }
 }
 
 impl<'a> files::Files<'a> for Context {
