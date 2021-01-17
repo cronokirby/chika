@@ -1,7 +1,7 @@
-use std::rc::Rc;
+use std::{ops::Range, rc::Rc};
 
 use crate::{
-    context::{Location, StringID},
+    context::{FileID, Location, StringID},
     lexer::Token,
     lexer::TokenType,
     types::BuiltinType,
@@ -422,11 +422,19 @@ impl Function {
 
 impl_has_location!(Function);
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 enum ErrorType {
-    InsufficientInput,
-    Expected(TokenType, TokenType),
-    Unexpected(TokenType),
+    InsufficientInput(TokenType),
+    Unexpected(TokenType, TokenType),
+}
+
+impl ErrorType {
+    fn at(self, location: Location) -> Error {
+        Error {
+            location,
+            error: self,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -441,12 +449,23 @@ pub type ParseResult<T> = Result<T, Error>;
 #[derive(Debug)]
 struct Parser {
     tokens: Vec<Token>,
+    file: FileID,
+    file_size: usize,
     pos: usize,
 }
 
 impl Parser {
-    fn new(tokens: Vec<Token>) -> Self {
-        Parser { tokens, pos: 0 }
+    fn new(file: FileID, file_size: usize, tokens: Vec<Token>) -> Self {
+        Parser {
+            tokens,
+            file,
+            file_size,
+            pos: 0,
+        }
+    }
+
+    fn location(&self, range: Range<usize>) -> Location {
+        Location::new(self.file, range)
     }
 
     fn peek(&self) -> Option<&Token> {
@@ -464,34 +483,24 @@ impl Parser {
         self.prev()
     }
 
-    fn check(&self, token: &Token) -> bool {
-        self.peek() == Some(token)
+    fn check(&self, token: TokenType) -> bool {
+        self.peek().map(|x| x.token) == Some(token)
     }
 
-    fn expect(&mut self, token: &Token) -> ParseResult<()> {
+    fn expect(&mut self, token: TokenType) -> ParseResult<()> {
         match self.peek() {
-            Some(right) if right == token => {
+            Some(right) if right.token == token => {
                 self.next();
                 Ok(())
             }
-            Some(wrong) => panic!("Expected {:?} got {:?}", token, wrong),
-            None => panic!("Insufficient input"),
-        }
-    }
-
-    fn extract<R, F>(&mut self, matcher: F) -> ParseResult<R>
-    where
-        F: Fn(&Token) -> Option<R>,
-    {
-        if let Some(p) = self.peek() {
-            if let Some(r) = matcher(p) {
-                self.next();
-                Ok(r)
-            } else {
-                panic!("Unexpected {:?}", p)
+            Some(wrong) => {
+                let loc = self.location(wrong.range.clone());
+                Err(ErrorType::Unexpected(wrong.token, token).at(loc))
             }
-        } else {
-            panic!("Insufficient input")
+            None => {
+                let loc = self.location(self.file_size..self.file_size);
+                Err(ErrorType::InsufficientInput(token).at(loc))
+            }
         }
     }
 }
