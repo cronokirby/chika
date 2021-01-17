@@ -422,9 +422,20 @@ impl Function {
 
 impl_has_location!(Function);
 
-enum ParseError {}
+#[derive(Debug)]
+enum ErrorType {
+    InsufficientInput,
+    Expected(TokenType, TokenType),
+    Unexpected(TokenType),
+}
 
-type ParseResult<T> = Result<T, ParseError>;
+#[derive(Debug)]
+pub struct Error {
+    location: Location,
+    error: ErrorType,
+}
+
+pub type ParseResult<T> = Result<T, Error>;
 
 /// Represents a parser, advancing over a series of tokens
 #[derive(Debug)]
