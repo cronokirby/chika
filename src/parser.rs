@@ -423,9 +423,17 @@ impl Function {
 impl_has_location!(Function);
 
 #[derive(Clone, Copy, Debug)]
+enum Unexpected {
+    EndOfInput,
+    Token(TokenType),
+}
+
+#[derive(Clone, Copy, Debug)]
 enum ErrorType {
-    InsufficientInput(TokenType),
-    Unexpected(TokenType, TokenType),
+    Expected(TokenType, Unexpected),
+    ExpectedName(Unexpected),
+    ExpectedIntLit(Unexpected),
+    ExpectedType(Unexpected),
 }
 
 impl ErrorType {
@@ -468,6 +476,10 @@ impl Parser {
         Location::new(self.file, range)
     }
 
+    fn end_location(&self) -> Location {
+        self.location(self.file_size..self.file_size)
+    }
+
     fn peek(&self) -> Option<&Token> {
         self.tokens.get(self.pos)
     }
@@ -495,11 +507,34 @@ impl Parser {
             }
             Some(wrong) => {
                 let loc = self.location(wrong.range.clone());
-                Err(ErrorType::Unexpected(wrong.token, token).at(loc))
+                Err(ErrorType::Expected(wrong.token, Unexpected::Token(token)).at(loc))
             }
             None => {
-                let loc = self.location(self.file_size..self.file_size);
-                Err(ErrorType::InsufficientInput(token).at(loc))
+                let loc = self.end_location();
+                Err(ErrorType::Expected(token, Unexpected::EndOfInput).at(loc))
+            }
+        }
+    }
+
+    fn extract<T, F, E>(&mut self, matcher: F, make_error: E) -> ParseResult<(Location, T)>
+    where
+        F: Fn(TokenType) -> Option<T>,
+        E: Fn(Unexpected) -> ErrorType,
+    {
+        match self.peek() {
+            Some(maybe) => match matcher(maybe.token) {
+                Some(ok) => {
+                    let loc = self.location(maybe.range.clone());
+                    Ok((loc, ok))
+                }
+                None => {
+                    let loc = self.location(maybe.range.clone());
+                    Err(make_error(Unexpected::Token(maybe.token)).at(loc))
+                }
+            },
+            None => {
+                let loc = self.end_location();
+                Err(make_error(Unexpected::EndOfInput).at(loc))
             }
         }
     }
