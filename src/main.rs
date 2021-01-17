@@ -58,14 +58,12 @@ enum Command {
     },
 }
 
-fn lex(input_file: &Path, debug: bool) -> Result<(), Error> {
-    let mut ctx = Context::with_main_file(input_file)?;
-
+fn lex(ctx: &mut Context) -> Result<Option<Vec<lexer::Token>>, Error> {
     let mut tokens = Vec::<lexer::Token>::new();
     let mut errors = Vec::<lexer::Error>::new();
 
     let source = ctx.source(ctx.main_file).unwrap().to_string();
-    for res in lexer::lex(&source, &mut ctx) {
+    for res in lexer::lex(&source, ctx) {
         match res {
             Ok(tok) => tokens.push(tok),
             Err(e) => errors.push(e),
@@ -81,8 +79,21 @@ fn lex(input_file: &Path, debug: bool) -> Result<(), Error> {
         for e in errors {
             e.print(&mut printer)?;
         }
-        return Ok(());
-    } else if debug {
+        return Ok(None);
+    }
+
+    Ok(Some(tokens))
+}
+
+fn lex_and_stop(input_file: &Path, debug: bool) -> Result<(), Error> {
+    let mut ctx = Context::with_main_file(input_file)?;
+
+    let tokens = match lex(&mut ctx)? {
+        None => return Ok(()),
+        Some(tokens) => tokens,
+    };
+
+    if debug {
         for t in tokens {
             println!("{:?}", t);
         }
@@ -100,31 +111,13 @@ fn lex(input_file: &Path, debug: bool) -> Result<(), Error> {
     Ok(())
 }
 
-fn parse(input_file: &Path) -> Result<(), Error> {
+fn parse_and_stop(input_file: &Path) -> Result<(), Error> {
     let mut ctx = Context::with_main_file(input_file)?;
 
-    let mut tokens = Vec::<lexer::Token>::new();
-    let mut errors = Vec::<lexer::Error>::new();
-
-    let source = ctx.source(ctx.main_file).unwrap().to_string();
-    for res in lexer::lex(&source, &mut ctx) {
-        match res {
-            Ok(tok) => tokens.push(tok),
-            Err(e) => errors.push(e),
-        }
-    }
-
-    if !errors.is_empty() {
-        let mut out = StandardStream::stderr(ColorChoice::Always);
-        let mut printer = context::Printer::new(&mut out, &ctx);
-        printer.set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))?;
-        writeln!(&mut printer, "Lexer Errors:\n")?;
-        printer.reset()?;
-        for e in errors {
-            e.print(&mut printer)?;
-        }
-        return Ok(());
-    }
+    let tokens = match lex(&mut ctx)? {
+        None => return Ok(()),
+        Some(tokens) => tokens,
+    };
 
     let file_size = ctx.file_size(ctx.main_file)?;
     let res = parser::parse(tokens, ctx.main_file, file_size);
@@ -137,8 +130,8 @@ fn main() {
 
     let args = Command::from_args();
     let res = match args {
-        Lex { input_file, debug } => lex(&input_file, debug),
-        Parse { input_file } => parse(&input_file),
+        Lex { input_file, debug } => lex_and_stop(&input_file, debug),
+        Parse { input_file } => parse_and_stop(&input_file),
         Simplify { .. } => {
             eprintln!("Simplification is not yet implemented.");
             Ok(())
