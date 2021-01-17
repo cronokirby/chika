@@ -2,6 +2,8 @@ use std::rc::Rc;
 
 use crate::{
     context::{Location, StringID},
+    lexer::Token,
+    lexer::TokenType,
     types::BuiltinType,
 };
 
@@ -419,3 +421,66 @@ impl Function {
 }
 
 impl_has_location!(Function);
+
+enum ParseError {}
+
+type ParseResult<T> = Result<T, ParseError>;
+
+/// Represents a parser, advancing over a series of tokens
+#[derive(Debug)]
+struct Parser {
+    tokens: Vec<Token>,
+    pos: usize,
+}
+
+impl Parser {
+    fn new(tokens: Vec<Token>) -> Self {
+        Parser { tokens, pos: 0 }
+    }
+
+    fn peek(&self) -> Option<&Token> {
+        self.tokens.get(self.pos)
+    }
+
+    fn prev(&self) -> &Token {
+        &self.tokens[self.pos - 1]
+    }
+
+    fn next(&mut self) -> &Token {
+        if self.pos < self.tokens.len() {
+            self.pos += 1;
+        }
+        self.prev()
+    }
+
+    fn check(&self, token: &Token) -> bool {
+        self.peek() == Some(token)
+    }
+
+    fn expect(&mut self, token: &Token) -> ParseResult<()> {
+        match self.peek() {
+            Some(right) if right == token => {
+                self.next();
+                Ok(())
+            }
+            Some(wrong) => panic!("Expected {:?} got {:?}", token, wrong),
+            None => panic!("Insufficient input"),
+        }
+    }
+
+    fn extract<R, F>(&mut self, matcher: F) -> ParseResult<R>
+    where
+        F: Fn(&Token) -> Option<R>,
+    {
+        if let Some(p) = self.peek() {
+            if let Some(r) = matcher(p) {
+                self.next();
+                Ok(r)
+            } else {
+                panic!("Unexpected {:?}", p)
+            }
+        } else {
+            panic!("Insufficient input")
+        }
+    }
+}
