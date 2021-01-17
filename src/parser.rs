@@ -28,6 +28,7 @@ enum Tag {
     BlockStatement,
     Statement,
     Function,
+    FunctionName,
 }
 
 /// Represents the kind of shape that a node can have.
@@ -422,6 +423,15 @@ impl Function {
 
 impl_has_location!(Function);
 
+#[derive(Debug)]
+pub struct AST(Rc<Node>);
+
+impl AST {
+    pub fn name(&self) -> StringID {
+        self.0.string()
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 enum Unexpected {
     EndOfInput,
@@ -516,7 +526,7 @@ impl Parser {
         }
     }
 
-    fn extract<T, F, E>(&mut self, matcher: F, make_error: E) -> ParseResult<(Location, T)>
+    fn extract<T, F, E>(&mut self, make_error: E, matcher: F) -> ParseResult<(Location, T)>
     where
         F: Fn(TokenType) -> Option<T>,
         E: Fn(Unexpected) -> ErrorType,
@@ -538,4 +548,26 @@ impl Parser {
             }
         }
     }
+
+    fn extract_name(&mut self) -> ParseResult<(Location, StringID)> {
+        self.extract(ErrorType::ExpectedName, |tok| match tok {
+            TokenType::VarName(n) => Some(n),
+            _ => None,
+        })
+    }
+
+    fn ast(&mut self) -> ParseResult<AST> {
+        let (loc, s) = self.extract_name()?;
+        let node = Node {
+            location: loc,
+            tag: Tag::FunctionName,
+            shape: NodeShape::String(s),
+        };
+        Ok(AST(Rc::new(node)))
+    }
+}
+
+pub fn parse(tokens: Vec<Token>, file: FileID, file_size: usize) -> ParseResult<AST> {
+    let mut parser = Parser::new(file, file_size, tokens);
+    parser.ast()
 }
