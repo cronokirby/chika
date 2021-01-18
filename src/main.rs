@@ -121,7 +121,18 @@ fn parse_and_stop(input_file: &Path) -> Result<(), Error> {
 
     let file_size = ctx.file_size(ctx.main_file)?;
     let res = parser::parse(tokens, ctx.main_file, file_size);
-    println!("{:#?}", res);
+    let ast = match res {
+        Ok(ast) => ast,
+        Err(e) => {
+            let mut out = StandardStream::stderr(ColorChoice::Always);
+            let mut printer = context::Printer::new(&mut out, &ctx);
+            printer.set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))?;
+            writeln!(&mut printer, "Parser Errors:\n")?;
+            printer.reset()?;
+            return e.print(&mut printer);
+        }
+    };
+    println!("{:#?}", ast);
     Ok(())
 }
 

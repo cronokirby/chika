@@ -1,11 +1,14 @@
+use crate::codespan_reporting::diagnostic::{Diagnostic, Label};
 use std::{ops::Range, rc::Rc};
 
 use crate::{
-    context::{FileID, Location, StringID},
+    context::{Context, DisplayWithContext, FileID, Location, Printable, Printer, StringID},
+    errors,
     lexer::Token,
     lexer::TokenType,
     types::BuiltinType,
 };
+use std::fmt;
 
 /// This is used to differentiatate different kinds of raw nodes.
 ///
@@ -438,6 +441,17 @@ enum Unexpected {
     Token(TokenType),
 }
 
+impl DisplayWithContext for Unexpected {
+    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+        use Unexpected::*;
+
+        match self {
+            EndOfInput => write!(f, "end of input"),
+            Token(token) => write!(f, "token: {}", token.with_ctx(ctx)),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 enum ErrorType {
     Expected(TokenType, Unexpected),
@@ -453,12 +467,46 @@ impl ErrorType {
             error: self,
         }
     }
+
+    fn unexpected(&self) -> Unexpected {
+        use ErrorType::*;
+
+        match self {
+            Expected(_, u) => *u,
+            ExpectedName(u) => *u,
+            ExpectedIntLit(u) => *u,
+            ExpectedType(u) => *u,
+        }
+    }
 }
 
 #[derive(Debug)]
 pub struct Error {
     location: Location,
     error: ErrorType,
+}
+
+impl Printable for Error {
+    fn print<'a>(&self, printer: &mut Printer<'a>) -> errors::Result<()> {
+        use ErrorType::*;
+
+        let unexpected = self.error.unexpected();
+
+        let note = match self.error {
+            Expected(tok, _) => format!("expected {} instead", tok.with_ctx(printer.ctx)),
+            ExpectedName(_) => format!("expected name instead"),
+            ExpectedIntLit(_) => format!("expected integer instead"),
+            ExpectedType(_) => format!("expected type instead"),
+        };
+        let diagnostic = Diagnostic::error()
+            .with_message(format!("Unexpected {}", unexpected.with_ctx(printer.ctx)))
+            .with_labels(vec![Label::primary(
+                self.location.file,
+                self.location.range.clone(),
+            )])
+            .with_notes(vec![note]);
+        printer.write_diagnostic(diagnostic)
+    }
 }
 
 pub type ParseResult<T> = Result<T, Error>;
