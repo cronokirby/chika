@@ -1,3 +1,4 @@
+use std::fmt;
 use std::fs;
 use std::io;
 use std::ops::Range;
@@ -147,6 +148,26 @@ impl<'a> files::Files<'a> for Context {
         line_index: usize,
     ) -> Result<Range<usize>, files::Error> {
         self.get_file(id)?.line_range(line_index)
+    }
+}
+
+pub trait DisplayWithContext {
+    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result;
+
+    fn with_ctx<'a>(&'a self, ctx: &'a Context) -> WithContext<'a, Self> {
+        WithContext { val: self, ctx }
+    }
+}
+
+#[derive(Debug)]
+pub struct WithContext<'a, T: ?Sized> {
+    val: &'a T,
+    ctx: &'a Context,
+}
+
+impl<'a, T: DisplayWithContext> fmt::Display for WithContext<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.val.fmt_with(self.ctx, f)
     }
 }
 
