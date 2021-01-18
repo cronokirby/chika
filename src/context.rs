@@ -151,7 +151,12 @@ impl<'a> files::Files<'a> for Context {
     }
 }
 
+/// A trait for items that can be displayed, provided that they have a context.
+///
+/// The main purpose of this trait is to display items that need a context
+/// to look up things like strings, etc.
 pub trait DisplayWithContext {
+    /// Format a given value using some context
     fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result;
 
     fn with_ctx<'a>(&'a self, ctx: &'a Context) -> WithContext<'a, Self> {
@@ -159,6 +164,10 @@ pub trait DisplayWithContext {
     }
 }
 
+/// Attach a context to some reference.
+///
+/// The main purpose of this is to implement Display for types implementing the
+/// `DisplayWithContext` trait.
 #[derive(Debug)]
 pub struct WithContext<'a, T: ?Sized> {
     val: &'a T,
@@ -220,8 +229,10 @@ impl<'a> WriteColor for Printer<'a> {
 
 /// A trait for things that are printable using a Printer.
 ///
-/// This is commonly used for things that benefit from having access to this context,
-/// so that they can print String IDs with actual strings, for example.
+/// The difference between this and DisplayWithContext is that
+/// the former composes well, and can be used with "sub-objects". This
+/// trait, on the other hand, is intented to be used for the final object
+/// presented by the compiler.
 pub trait Printable {
     fn print<'a>(&self, printer: &mut Printer<'a>) -> errors::Result<()>;
 }
