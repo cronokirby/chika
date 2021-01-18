@@ -1,8 +1,4 @@
-use crate::{
-    context::{Printable, Printer},
-    errors::Error,
-};
-use std::io::Write;
+use std::fmt;
 
 /// Represents a kind of builtin type we know about
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -13,14 +9,13 @@ pub enum BuiltinType {
     Unit,
 }
 
-impl Printable for BuiltinType {
-    fn print<'a>(&self, printer: &mut Printer<'a>) -> Result<(), Error> {
+impl fmt::Display for BuiltinType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use BuiltinType::*;
 
         match self {
-            I32 => write!(printer, "I32")?,
-            Unit => write!(printer, "Unit")?,
+            I32 => write!(f, "I32"),
+            Unit => write!(f, "Unit"),
         }
-        Ok(())
     }
 }

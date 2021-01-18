@@ -2,11 +2,12 @@ use std::{iter::Peekable, ops::Range, str::Chars};
 
 use codespan_reporting::diagnostic::Diagnostic;
 
-use crate::context::{Context, Location, Printable, Printer, StringID};
+use crate::context::{Context, DisplayWithContext, Location, Printable, Printer, StringID};
 use crate::errors;
 use crate::interner::StringInterner;
 use crate::types::BuiltinType;
 use crate::{codespan_reporting::diagnostic::Label, context::FileID};
+use std::fmt;
 use std::io::Write;
 
 /// Represents the contents of a given token, letting us separate different variants.
@@ -50,31 +51,30 @@ pub enum TokenType {
     BuiltinTypeName(BuiltinType),
 }
 
-impl Printable for TokenType {
-    fn print<'a>(&self, printer: &mut Printer<'a>) -> errors::Result<()> {
+impl DisplayWithContext for TokenType {
+    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
         use TokenType::*;
 
         match *self {
-            OpenBrace => write!(printer, "{{")?,
-            CloseBrace => write!(printer, "}}")?,
-            OpenParens => write!(printer, "(")?,
-            CloseParens => write!(printer, ")")?,
-            Semicolon => write!(printer, ";")?,
-            Colon => write!(printer, ":")?,
-            Comma => write!(printer, ",")?,
-            Plus => write!(printer, "+")?,
-            Minus => write!(printer, "-")?,
-            Div => write!(printer, "/")?,
-            Times => write!(printer, "*")?,
-            Equals => write!(printer, "=")?,
-            Fn => write!(printer, "fn")?,
-            Return => write!(printer, "return")?,
-            Var => write!(printer, "var")?,
-            IntLit(i) => write!(printer, "{}", i)?,
-            VarName(id) => write!(printer, "{}", printer.ctx.get_string(id))?,
-            BuiltinTypeName(b) => b.print(printer)?,
+            OpenBrace => write!(f, "{{"),
+            CloseBrace => write!(f, "}}"),
+            OpenParens => write!(f, "("),
+            CloseParens => write!(f, ")"),
+            Semicolon => write!(f, ";"),
+            Colon => write!(f, ":"),
+            Comma => write!(f, ","),
+            Plus => write!(f, "+"),
+            Minus => write!(f, "-"),
+            Div => write!(f, "/"),
+            Times => write!(f, "*"),
+            Equals => write!(f, "="),
+            Fn => write!(f, "fn"),
+            Return => write!(f, "return"),
+            Var => write!(f, "var"),
+            IntLit(i) => write!(f, "{}", i),
+            VarName(id) => write!(f, "{}", ctx.get_string(id)),
+            BuiltinTypeName(b) => write!(f, "{}", b),
         }
-        Ok(())
     }
 }
 
@@ -99,8 +99,7 @@ impl Token {
 
 impl Printable for Token {
     fn print<'a>(&self, printer: &mut Printer<'a>) -> errors::Result<()> {
-        self.token.print(printer)?;
-        write!(printer, "\t{:?}", self.range)?;
+        write!(printer, "{}\t{:?}", self.token.with_ctx(printer.ctx), self.range)?;
         Ok(())
     }
 }
