@@ -30,8 +30,10 @@ enum Tag {
     ExprStatement,
     BlockStatement,
     Statement,
+    AST,
     Function,
-    FunctionName,
+    Name,
+    Type,
 }
 
 /// Represents the kind of shape that a node can have.
@@ -402,12 +404,13 @@ impl Function {
 
     /// The return type for this function
     pub fn return_type(&self) -> BuiltinType {
-        self.0.branch()[1].typ()
+        let branch = self.0.branch();
+        branch[branch.len() - 2].typ()
     }
 
     /// The body of this function
     fn body(&self) -> BlockStatement {
-        BlockStatement(self.0.branch()[2].clone())
+        BlockStatement(self.0.branch().last().unwrap().clone())
     }
 
     /// The number of parameters to this function
@@ -417,7 +420,7 @@ impl Function {
 
     /// The ith parameter to this function
     fn param(&self, i: usize) -> (StringID, BuiltinType) {
-        let j = i - 3;
+        let j = 2 * i + 1;
         let string = self.0.branch()[j].string();
         let typ = self.0.branch()[j + 1].typ();
         (string, typ)
@@ -430,8 +433,14 @@ impl_has_location!(Function);
 pub struct AST(Rc<Node>);
 
 impl AST {
-    pub fn name(&self) -> StringID {
-        self.0.string()
+    /// The number of functions in this tree
+    pub fn function_count(&self) -> usize {
+        self.0.branch().len()
+    }
+
+    /// The nth function in this tree
+    pub fn function(&self, i: usize) -> Function {
+        Function(self.0.branch()[i].clone())
     }
 }
 
@@ -557,15 +566,16 @@ impl Parser {
         self.peek().map(|x| x.token) == Some(token)
     }
 
-    fn expect(&mut self, token: TokenType) -> ParseResult<()> {
+    fn expect(&mut self, token: TokenType) -> ParseResult<Location> {
         match self.peek() {
             Some(right) if right.token == token => {
+                let ret = self.location(right.range.clone());
                 self.next();
-                Ok(())
+                Ok(ret)
             }
             Some(wrong) => {
                 let loc = self.location(wrong.range.clone());
-                Err(ErrorType::Expected(wrong.token, Unexpected::Token(token)).at(loc))
+                Err(ErrorType::Expected(token, Unexpected::Token(wrong.token)).at(loc))
             }
             None => {
                 let loc = self.end_location();
@@ -583,6 +593,7 @@ impl Parser {
             Some(maybe) => match matcher(maybe.token) {
                 Some(ok) => {
                     let loc = self.location(maybe.range.clone());
+                    self.next();
                     Ok((loc, ok))
                 }
                 None => {
@@ -604,12 +615,86 @@ impl Parser {
         })
     }
 
-    fn ast(&mut self) -> ParseResult<AST> {
-        let (loc, s) = self.extract_name()?;
+    fn extract_type(&mut self) -> ParseResult<(Location, BuiltinType)> {
+        self.extract(ErrorType::ExpectedType, |tok| match tok {
+            TokenType::BuiltinTypeName(n) => Some(n),
+            _ => None,
+        })
+    }
+
+    fn block(&mut self) -> ParseResult<Rc<Node>> {
+        let start_loc = self.expect(TokenType::OpenBrace)?;
+        let end_loc = self.expect(TokenType::CloseBrace)?;
+        let location = Location::new(start_loc.file, start_loc.range.start..end_loc.range.end);
         let node = Node {
-            location: loc,
-            tag: Tag::FunctionName,
-            shape: NodeShape::String(s),
+            location,
+            tag: Tag::BlockStatement,
+            shape: NodeShape::Branch(Vec::new()),
+        };
+        Ok(Rc::new(node))
+    }
+
+    fn params(&mut self, _buf: &mut Vec<Rc<Node>>) -> ParseResult<()> {
+        self.expect(TokenType::OpenParens)?;
+        self.expect(TokenType::CloseParens)?;
+        Ok(())
+    }
+
+    fn function(&mut self) -> ParseResult<Rc<Node>> {
+        let start_loc = self.expect(TokenType::Fn)?;
+        let mut branch = Vec::new();
+
+        let (name_loc, name) = self.extract_name()?;
+        branch.push(Rc::new(Node {
+            location: name_loc,
+            tag: Tag::Name,
+            shape: NodeShape::String(name),
+        }));
+
+        self.params(&mut branch)?;
+
+        self.expect(TokenType::Colon)?;
+        let (typ_loc, typ) = self.extract_type()?;
+        branch.push(Rc::new(Node {
+            location: typ_loc,
+            tag: Tag::Type,
+            shape: NodeShape::Type(typ),
+        }));
+
+        let block = self.block()?;
+        branch.push(block.clone());
+
+        let location = Location::new(
+            start_loc.file,
+            start_loc.range.start..block.location.range.end,
+        );
+        let node = Node {
+            location,
+            tag: Tag::Function,
+            shape: NodeShape::Branch(branch),
+        };
+        Ok(Rc::new(node))
+    }
+
+    fn ast(&mut self) -> ParseResult<AST> {
+        let mut functions = Vec::new();
+        let mut start = None;
+        let mut end = 0;
+        while self.check(TokenType::Fn) {
+            let function = self.function()?;
+            let range = &function.location.range;
+            if let None = start {
+                start = Some(range.start);
+            }
+            end = range.end;
+
+            functions.push(function);
+        }
+        let location = Location::new(self.file, start.unwrap_or(end)..end);
+        let node = Node {
+            location,
+            tag: Tag::AST,
+            shape: NodeShape::Branch(functions),
         };
         Ok(AST(Rc::new(node)))
     }
