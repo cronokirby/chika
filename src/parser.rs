@@ -24,12 +24,11 @@ enum Tag {
     BinExprSub,
     BinExprDiv,
     VarExpr,
-    Expr,
+    ExprStatement,
     ReturnStatement,
     VarStatement,
     IfStatement,
     IfElseStatement,
-    ExprStatement,
     BlockStatement,
     Statement,
     AST,
@@ -469,6 +468,7 @@ enum ErrorType {
     ExpectedName(Unexpected),
     ExpectedIntLit(Unexpected),
     ExpectedType(Unexpected),
+    ExpectedExpr(Unexpected),
 }
 
 impl ErrorType {
@@ -487,6 +487,7 @@ impl ErrorType {
             ExpectedName(u) => *u,
             ExpectedIntLit(u) => *u,
             ExpectedType(u) => *u,
+            ExpectedExpr(u) => *u,
         }
     }
 }
@@ -503,11 +504,15 @@ impl Printable for Error {
 
         let unexpected = self.error.unexpected();
 
-        let note = match self.error {
-            Expected(tok, _) => format!("expected {} instead", tok.with_ctx(printer.ctx)),
-            ExpectedName(_) => format!("expected name instead"),
-            ExpectedIntLit(_) => format!("expected integer instead"),
-            ExpectedType(_) => format!("expected type instead"),
+        let notes = match self.error {
+            Expected(tok, _) => vec![format!("expected {} instead", tok.with_ctx(printer.ctx))],
+            ExpectedName(_) => vec![format!("expected name instead")],
+            ExpectedIntLit(_) => vec![format!("expected integer instead")],
+            ExpectedType(_) => vec![format!("expected type instead")],
+            ExpectedExpr(_) => vec![
+                format!("trying to parse an expression"),
+                format!("expected an integer, or a name instead"),
+            ],
         };
         let diagnostic = Diagnostic::error()
             .with_message(format!("Unexpected {}", unexpected.with_ctx(printer.ctx)))
@@ -515,7 +520,7 @@ impl Printable for Error {
                 self.location.file,
                 self.location.range.clone(),
             )])
-            .with_notes(vec![note]);
+            .with_notes(notes);
         printer.write_diagnostic(diagnostic)
     }
 }
@@ -624,13 +629,66 @@ impl Parser {
         })
     }
 
+    fn expr(&mut self) -> ParseResult<Rc<Node>> {
+        match self.peek() {
+            Some(Token {
+                token: IntLit(u),
+                range,
+            }) => {
+                let location = self.location(range.clone());
+                let ret = Rc::new(Node {
+                    location,
+                    tag: Tag::IntLitExpr,
+                    shape: NodeShape::IntLit(*u),
+                });
+                self.next();
+                Ok(ret)
+            }
+            Some(Token {
+                token: VarName(s),
+                range,
+            }) => {
+                let location = self.location(range.clone());
+                let ret = Rc::new(Node {
+                    location,
+                    tag: Tag::VarExpr,
+                    shape: NodeShape::String(*s),
+                });
+                self.next();
+                Ok(ret)
+            }
+            Some(other) => {
+                let location = self.location(other.range.clone());
+                Err(ErrorType::ExpectedExpr(Unexpected::Token(other.token)).at(location))
+            }
+            None => {
+                let loc = self.end_location();
+                Err(ErrorType::ExpectedExpr(Unexpected::EndOfInput).at(loc))
+            }
+        }
+    }
+
+    fn statement(&mut self) -> ParseResult<Rc<Node>> {
+        let expr = self.expr()?;
+        let end_loc = self.expect(TokenType::Semicolon)?;
+        Ok(Rc::new(Node {
+            location: expr.location.to(&end_loc),
+            tag: Tag::ExprStatement,
+            shape: NodeShape::Branch(vec![expr]),
+        }))
+    }
+
     fn block(&mut self) -> ParseResult<Rc<Node>> {
         let start_loc = self.expect(OpenBrace)?;
+        let mut statements = Vec::new();
+        while !self.check(CloseBrace) {
+            statements.push(self.statement()?);
+        }
         let end_loc = self.expect(CloseBrace)?;
         let node = Node {
             location: start_loc.to(&end_loc),
             tag: Tag::BlockStatement,
-            shape: NodeShape::Branch(Vec::new()),
+            shape: NodeShape::Branch(statements),
         };
         Ok(Rc::new(node))
     }
