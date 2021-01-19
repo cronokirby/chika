@@ -30,7 +30,6 @@ enum Tag {
     IfStatement,
     IfElseStatement,
     BlockStatement,
-    Statement,
     AST,
     Function,
     Name,
@@ -707,10 +706,24 @@ impl Parser {
         }))
     }
 
+    fn return_statement(&mut self) -> ParseResult<Rc<Node>> {
+        let start = self.expect(Return)?;
+        let expr = self.expr()?;
+        let end = self.expect(Semicolon)?;
+        Ok(Rc::new(Node {
+            location: start.to(&end),
+            tag: Tag::ReturnStatement,
+            shape: NodeShape::Branch(vec![expr]),
+        }))
+    }
+
     fn statement(&mut self) -> ParseResult<Rc<Node>> {
         match self.peek() {
             Some(Token { token: Var, .. }) => self.var_statement(),
-            Some(Token { token: OpenBrace, .. }) => self.block(),
+            Some(Token {
+                token: OpenBrace, ..
+            }) => self.block(),
+            Some(Token { token: Return, .. }) => self.return_statement(),
             Some(_) => self.expr_statement(),
             None => {
                 let loc = self.end_location();
