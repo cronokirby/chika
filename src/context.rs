@@ -277,7 +277,7 @@ pub trait Printable {
 }
 
 /// A location of some item in the source code
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Location {
     /// The file this snippet originates from
     pub file: FileID,

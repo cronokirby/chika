@@ -45,6 +45,10 @@ pub enum TokenType {
     Return,
     /// `var` keyword
     Var,
+    /// `if` keyword
+    If,
+    /// `else` keyword
+    Else,
     /// An integer litteral
     IntLit(u32),
     /// A variable name
@@ -73,6 +77,8 @@ impl DisplayWithContext for TokenType {
             Fn => write!(f, "fn"),
             Return => write!(f, "return"),
             Var => write!(f, "var"),
+            If => write!(f, "if"),
+            Else => write!(f, "else"),
             IntLit(i) => write!(f, "{}", i),
             VarName(id) => write!(f, "{}", ctx.ctx.get_string(id)),
             BuiltinTypeName(b) => write!(f, "{}", b),
@@ -261,6 +267,8 @@ impl<'a> Iterator for Lexer<'a> {
                     "fn" => Fn,
                     "return" => Return,
                     "var" => Var,
+                    "if" => If,
+                    "else" => Else,
                     _ => VarName(self.interner.intern(&mut self.ctx, ident)),
                 }
             }
@@ -329,5 +337,10 @@ mod test {
     #[test]
     fn unknown_characters_fail() {
         should_not_lex("² ΅ ´");
+    }
+
+    #[test]
+    fn if_else_lexes() {
+        should_lex("if else")
     }
 }

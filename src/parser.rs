@@ -343,7 +343,7 @@ impl Statement {
             Tag::VarStatement => VarStatement(self.0.clone()).into(),
             Tag::BlockStatement => BlockStatement(self.0.clone()).into(),
             Tag::IfStatement => IfStatement::new(false, self.0.clone()).into(),
-            Tag::IfElseStatement => IfStatement::new(false, self.0.clone()).into(),
+            Tag::IfElseStatement => IfStatement::new(true, self.0.clone()).into(),
             Tag::ExprStatement => ExprStatement(self.0.clone()).into(),
             other => panic!("unexpected tag {:?}", other),
         }
@@ -875,6 +875,39 @@ impl Parser {
         }))
     }
 
+    fn if_statement(&mut self) -> ParseResult<Rc<Node>> {
+        let mut branch = Vec::new();
+
+        let start = self.expect(If)?;
+
+        self.expect(OpenParens)?;
+        let cond = self.expr()?;
+        self.expect(CloseParens)?;
+        branch.push(cond);
+
+        let statement = self.statement()?;
+        let statement_loc = statement.location.clone();
+        branch.push(statement);
+
+        if self.check(Else) {
+            self.next();
+            let else_part = self.statement()?;
+            let location = start.to(&else_part.location);
+            branch.push(else_part);
+            Ok(Rc::new(Node {
+                location,
+                tag: Tag::IfElseStatement,
+                shape: NodeShape::Branch(branch),
+            }))
+        } else {
+            Ok(Rc::new(Node {
+                location: start.to(&statement_loc),
+                tag: Tag::IfStatement,
+                shape: NodeShape::Branch(branch),
+            }))
+        }
+    }
+
     fn statement(&mut self) -> ParseResult<Rc<Node>> {
         match self.peek() {
             Some(Token { token: Var, .. }) => self.var_statement(),
@@ -882,6 +915,7 @@ impl Parser {
                 token: OpenBrace, ..
             }) => self.block(),
             Some(Token { token: Return, .. }) => self.return_statement(),
+            Some(Token { token: If, .. }) => self.if_statement(),
             Some(_) => self.expr_statement(),
             None => {
                 let loc = self.end_location();
@@ -1039,6 +1073,25 @@ mod test {
             {
                 var y: I32 = 4;
                 4;
+            }
+        }
+        "#,
+        )
+    }
+
+    #[test]
+    fn if_else_parses() {
+        should_parse(
+            r#"
+        fn foo(): Unit {
+            if (1) {
+                0;
+            } else {
+                0;
+            }
+
+            if (1) {
+                0;
             }
         }
         "#,
