@@ -1,5 +1,5 @@
-use std::ops::Fn;
 use crate::codespan_reporting::diagnostic::{Diagnostic, Label};
+use std::ops::Fn;
 use std::{ops::Range, rc::Rc};
 
 use crate::{
@@ -627,9 +627,8 @@ impl Parser {
     fn block(&mut self) -> ParseResult<Rc<Node>> {
         let start_loc = self.expect(OpenBrace)?;
         let end_loc = self.expect(CloseBrace)?;
-        let location = Location::new(start_loc.file, start_loc.range.start..end_loc.range.end);
         let node = Node {
-            location,
+            location: start_loc.to(&end_loc),
             tag: Tag::BlockStatement,
             shape: NodeShape::Branch(Vec::new()),
         };
@@ -690,12 +689,8 @@ impl Parser {
         let block = self.block()?;
         branch.push(block.clone());
 
-        let location = Location::new(
-            start_loc.file,
-            start_loc.range.start..block.location.range.end,
-        );
         let node = Node {
-            location,
+            location: start_loc.to(&block.location),
             tag: Tag::Function,
             shape: NodeShape::Branch(branch),
         };

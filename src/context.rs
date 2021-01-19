@@ -251,4 +251,10 @@ impl Location {
     pub fn new(file: FileID, range: Range<usize>) -> Self {
         Location { file, range }
     }
+
+    /// Create a new location spanning from this location to that location
+    pub fn to(&self, that: &Location) -> Self {
+        assert_eq!(self.file, that.file);
+        Location::new(self.file, self.range.start..that.range.end)
+    }
 }
