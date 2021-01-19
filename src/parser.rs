@@ -1,3 +1,4 @@
+use std::ops::Fn;
 use crate::codespan_reporting::diagnostic::{Diagnostic, Label};
 use std::{ops::Range, rc::Rc};
 
@@ -9,6 +10,7 @@ use crate::{
     types::BuiltinType,
 };
 use std::fmt;
+use TokenType::*;
 
 /// This is used to differentiatate different kinds of raw nodes.
 ///
@@ -623,8 +625,8 @@ impl Parser {
     }
 
     fn block(&mut self) -> ParseResult<Rc<Node>> {
-        let start_loc = self.expect(TokenType::OpenBrace)?;
-        let end_loc = self.expect(TokenType::CloseBrace)?;
+        let start_loc = self.expect(OpenBrace)?;
+        let end_loc = self.expect(CloseBrace)?;
         let location = Location::new(start_loc.file, start_loc.range.start..end_loc.range.end);
         let node = Node {
             location,
@@ -634,14 +636,38 @@ impl Parser {
         Ok(Rc::new(node))
     }
 
-    fn params(&mut self, _buf: &mut Vec<Rc<Node>>) -> ParseResult<()> {
-        self.expect(TokenType::OpenParens)?;
-        self.expect(TokenType::CloseParens)?;
+    fn single_param(&mut self, buf: &mut Vec<Rc<Node>>) -> ParseResult<()> {
+        let (name_loc, name) = self.extract_name()?;
+        buf.push(Rc::new(Node {
+            location: name_loc,
+            tag: Tag::Name,
+            shape: NodeShape::String(name),
+        }));
+        self.expect(Colon)?;
+        let (typ_loc, typ) = self.extract_type()?;
+        buf.push(Rc::new(Node {
+            location: typ_loc,
+            tag: Tag::Type,
+            shape: NodeShape::Type(typ),
+        }));
+        Ok(())
+    }
+
+    fn params(&mut self, buf: &mut Vec<Rc<Node>>) -> ParseResult<()> {
+        self.expect(OpenParens)?;
+        if !self.check(CloseParens) {
+            self.single_param(buf)?;
+            while self.check(Comma) {
+                self.next();
+                self.single_param(buf)?;
+            }
+        }
+        self.expect(CloseParens)?;
         Ok(())
     }
 
     fn function(&mut self) -> ParseResult<Rc<Node>> {
-        let start_loc = self.expect(TokenType::Fn)?;
+        let start_loc = self.expect(Fn)?;
         let mut branch = Vec::new();
 
         let (name_loc, name) = self.extract_name()?;
@@ -680,7 +706,7 @@ impl Parser {
         let mut functions = Vec::new();
         let mut start = None;
         let mut end = 0;
-        while self.check(TokenType::Fn) {
+        while self.check(Fn) {
             let function = self.function()?;
             let range = &function.location.range;
             if let None = start {
