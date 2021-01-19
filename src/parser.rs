@@ -583,9 +583,9 @@ impl DisplayWithContext for AST {
     fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "(ast")?;
         for i in 0..self.function_count() {
-            write!(f, "\n{}", self.function(i).with_ctx(ctx))?;
+            write!(f, "\n\n{}", self.function(i).with_ctx(ctx))?;
         }
-        write!(f, "\n)")
+        write!(f, "\n\n)")
     }
 }
 
