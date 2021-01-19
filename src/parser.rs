@@ -142,6 +142,16 @@ pub enum ExprKind {
     BinExpr(BinExpr),
 }
 
+impl DisplayWithContext for ExprKind {
+    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ExprKind::IntLitExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
+            ExprKind::VarExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
+            ExprKind::BinExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
+        }
+    }
+}
+
 /// Represents a generic kind of expression
 #[derive(Debug)]
 pub struct Expr(Rc<Node>);
@@ -161,6 +171,12 @@ impl Expr {
     }
 }
 
+impl DisplayWithContext for Expr {
+    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+        self.kind().fmt_with(ctx, f)
+    }
+}
+
 impl_has_location!(Expr);
 
 /// An integer literal, used as an expression
@@ -171,6 +187,12 @@ impl IntLitExpr {
     /// The underlying integer composing this expression
     pub fn int_lit(&self) -> u32 {
         self.0.int_lit()
+    }
+}
+
+impl DisplayWithContext for IntLitExpr {
+    fn fmt_with(&self, _ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.int_lit())
     }
 }
 
@@ -188,6 +210,12 @@ impl VarExpr {
     }
 }
 
+impl DisplayWithContext for VarExpr {
+    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", ctx.get_string(self.var()))
+    }
+}
+
 impl_variant!(ExprKind, VarExpr);
 impl_has_location!(VarExpr);
 
@@ -202,6 +230,17 @@ pub enum BinOp {
     Sub,
     /// Divide two integers
     Div,
+}
+
+impl DisplayWithContext for BinOp {
+    fn fmt_with(&self, _ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            BinOp::Add => write!(f, "+"),
+            BinOp::Mul => write!(f, "*"),
+            BinOp::Sub => write!(f, "-"),
+            BinOp::Div => write!(f, "/"),
+        }
+    }
 }
 
 /// An expression applying a binary operator to two expressions
@@ -252,6 +291,18 @@ impl BinExpr {
     }
 }
 
+impl DisplayWithContext for BinExpr {
+    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "({} {} {})",
+            self.op.with_ctx(ctx),
+            self.lhs().with_ctx(ctx),
+            self.rhs().with_ctx(ctx)
+        )
+    }
+}
+
 impl_variant!(ExprKind, BinExpr);
 impl_has_location!(BinExpr, node);
 
@@ -267,6 +318,18 @@ pub enum StatementKind {
     IfStatement(IfStatement),
     /// An expression, used as a statement
     ExprStatement(ExprStatement),
+}
+
+impl DisplayWithContext for StatementKind {
+    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            StatementKind::ReturnStatement(s) => s.fmt_with(ctx, f),
+            StatementKind::VarStatement(s) => s.fmt_with(ctx, f),
+            StatementKind::BlockStatement(s) => s.fmt_with(ctx, f),
+            StatementKind::IfStatement(s) => s.fmt_with(ctx, f),
+            StatementKind::ExprStatement(s) => s.fmt_with(ctx, f),
+        }
+    }
 }
 
 pub struct Statement(Rc<Node>);
@@ -285,6 +348,12 @@ impl Statement {
     }
 }
 
+impl DisplayWithContext for Statement {
+    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+        self.kind().fmt_with(ctx, f)
+    }
+}
+
 impl_has_location!(Statement);
 
 /// A statement returning the value of some expression
@@ -294,6 +363,12 @@ impl ReturnStatement {
     /// The underlying expression being returned
     pub fn expr(&self) -> Expr {
         Expr(self.0.branch()[0].clone())
+    }
+}
+
+impl DisplayWithContext for ReturnStatement {
+    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(return {})", self.expr().with_ctx(ctx))
     }
 }
 
@@ -320,6 +395,18 @@ impl VarStatement {
     }
 }
 
+impl DisplayWithContext for VarStatement {
+    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "(var {} {} {})",
+            ctx.get_string(self.var()),
+            self.typ(),
+            self.expr().with_ctx(ctx)
+        )
+    }
+}
+
 impl_variant!(StatementKind, VarStatement);
 impl_has_location!(VarStatement);
 
@@ -335,6 +422,16 @@ impl BlockStatement {
     /// The ith statement in this block
     fn statement(&self, i: usize) -> Statement {
         Statement(self.0.branch()[i].clone())
+    }
+}
+
+impl DisplayWithContext for BlockStatement {
+    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(block\n")?;
+        for i in 0..self.len() {
+            write!(f, "{}\n", self.statement(i).with_ctx(ctx))?;
+        }
+        write!(f, ")")
     }
 }
 
@@ -374,6 +471,27 @@ impl IfStatement {
     }
 }
 
+impl DisplayWithContext for IfStatement {
+    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Some(else_part) = self.else_branch() {
+            write!(
+                f,
+                "(if-else {} {} {})",
+                self.cond().with_ctx(ctx),
+                self.if_branch().with_ctx(ctx),
+                else_part.with_ctx(ctx)
+            )
+        } else {
+            write!(
+                f,
+                "(if {} {})",
+                self.cond().with_ctx(ctx),
+                self.if_branch().with_ctx(ctx)
+            )
+        }
+    }
+}
+
 impl_variant!(StatementKind, IfStatement);
 impl_has_location!(IfStatement, node);
 
@@ -387,6 +505,12 @@ impl ExprStatement {
     /// The expression making up this statement
     pub fn expr(&self) -> Expr {
         Expr(self.0.branch()[0].clone())
+    }
+}
+
+impl DisplayWithContext for ExprStatement {
+    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+        self.expr().fmt_with(ctx, f)
     }
 }
 
@@ -427,6 +551,17 @@ impl Function {
     }
 }
 
+impl DisplayWithContext for Function {
+    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(fn {}", ctx.get_string(self.name()))?;
+        for i in 0..self.param_count() {
+            let (s, typ) = self.param(i);
+            write!(f, " (: {} {})", ctx.get_string(s), typ)?;
+        }
+        write!(f, " {} {})", self.return_type(), self.body().with_ctx(ctx))
+    }
+}
+
 impl_has_location!(Function);
 
 #[derive(Debug)]
@@ -441,6 +576,16 @@ impl AST {
     /// The nth function in this tree
     pub fn function(&self, i: usize) -> Function {
         Function(self.0.branch()[i].clone())
+    }
+}
+
+impl DisplayWithContext for AST {
+    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(ast")?;
+        for i in 0..self.function_count() {
+            write!(f, "\n{}", self.function(i).with_ctx(ctx))?;
+        }
+        write!(f, "\n)")
     }
 }
 
