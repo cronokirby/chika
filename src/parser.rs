@@ -317,7 +317,7 @@ impl VarStatement {
 
     /// The expression value for the variable
     pub fn expr(&self) -> Expr {
-        Expr(self.0.branch()[0].clone())
+        Expr(self.0.branch()[2].clone())
     }
 }
 
@@ -469,6 +469,7 @@ enum ErrorType {
     ExpectedIntLit(Unexpected),
     ExpectedType(Unexpected),
     ExpectedExpr(Unexpected),
+    ExpectedStatement(Unexpected),
 }
 
 impl ErrorType {
@@ -488,6 +489,7 @@ impl ErrorType {
             ExpectedIntLit(u) => *u,
             ExpectedType(u) => *u,
             ExpectedExpr(u) => *u,
+            ExpectedStatement(u) => *u,
         }
     }
 }
@@ -513,6 +515,7 @@ impl Printable for Error {
                 format!("trying to parse an expression"),
                 format!("expected an integer, or a name instead"),
             ],
+            ExpectedStatement(_) => vec![format!("trying to parse a statement")],
         };
         let diagnostic = Diagnostic::error()
             .with_message(format!("Unexpected {}", unexpected.with_ctx(printer.ctx)))
@@ -668,7 +671,7 @@ impl Parser {
         }
     }
 
-    fn statement(&mut self) -> ParseResult<Rc<Node>> {
+    fn expr_statement(&mut self) -> ParseResult<Rc<Node>> {
         let expr = self.expr()?;
         let end_loc = self.expect(TokenType::Semicolon)?;
         Ok(Rc::new(Node {
@@ -676,6 +679,43 @@ impl Parser {
             tag: Tag::ExprStatement,
             shape: NodeShape::Branch(vec![expr]),
         }))
+    }
+
+    fn var_statement(&mut self) -> ParseResult<Rc<Node>> {
+        let start = self.expect(Var)?;
+        let mut branch = Vec::new();
+        let (name_loc, name) = self.extract_name()?;
+        branch.push(Rc::new(Node {
+            location: name_loc,
+            tag: Tag::Name,
+            shape: NodeShape::String(name),
+        }));
+        self.expect(Colon)?;
+        let (typ_loc, typ) = self.extract_type()?;
+        branch.push(Rc::new(Node {
+            location: typ_loc,
+            tag: Tag::Type,
+            shape: NodeShape::Type(typ),
+        }));
+        self.expect(Equals)?;
+        branch.push(self.expr()?);
+        let end_loc = self.expect(Semicolon)?;
+        Ok(Rc::new(Node {
+            location: start.to(&end_loc),
+            tag: Tag::VarStatement,
+            shape: NodeShape::Branch(branch),
+        }))
+    }
+
+    fn statement(&mut self) -> ParseResult<Rc<Node>> {
+        match self.peek() {
+            Some(Token { token: Var, .. }) => self.var_statement(),
+            Some(_) => self.expr_statement(),
+            None => {
+                let loc = self.end_location();
+                Err(ErrorType::ExpectedStatement(Unexpected::EndOfInput).at(loc))
+            }
+        }
     }
 
     fn block(&mut self) -> ParseResult<Rc<Node>> {
