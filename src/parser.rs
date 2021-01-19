@@ -710,6 +710,7 @@ impl Parser {
     fn statement(&mut self) -> ParseResult<Rc<Node>> {
         match self.peek() {
             Some(Token { token: Var, .. }) => self.var_statement(),
+            Some(Token { token: OpenBrace, .. }) => self.block(),
             Some(_) => self.expr_statement(),
             None => {
                 let loc = self.end_location();
