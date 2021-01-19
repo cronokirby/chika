@@ -151,15 +151,47 @@ impl<'a> files::Files<'a> for Context {
     }
 }
 
+const INDENT_SIZE: usize = 2;
+
+/// Represents the kind of context we use when displaying things
+///
+/// This has some information about indentation, and stuff like that
+#[derive(Clone, Copy, Debug)]
+pub struct DisplayContext<'a> {
+    pub ctx: &'a Context,
+    indent: usize,
+}
+
+impl<'a> DisplayContext<'a> {
+    /// Create a new context, but further indented
+    pub fn indented(self) -> DisplayContext<'a> {
+        DisplayContext {
+            ctx: self.ctx,
+            indent: self.indent + INDENT_SIZE,
+        }
+    }
+
+    /// Write out blank space according to the indentation of this context
+    pub fn blank_space(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:<width$}", "", width = self.indent)
+    }
+}
+
+impl<'a> From<&'a Context> for DisplayContext<'a> {
+    fn from(ctx: &'a Context) -> Self {
+        DisplayContext { ctx, indent: 0 }
+    }
+}
+
 /// A trait for items that can be displayed, provided that they have a context.
 ///
 /// The main purpose of this trait is to display items that need a context
 /// to look up things like strings, etc.
 pub trait DisplayWithContext {
     /// Format a given value using some context
-    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result;
+    fn fmt_with<'a>(&self, ctx: DisplayContext<'a>, f: &mut fmt::Formatter) -> fmt::Result;
 
-    fn with_ctx<'a>(&'a self, ctx: &'a Context) -> WithContext<'a, Self> {
+    fn with_ctx<'a>(&'a self, ctx: DisplayContext<'a>) -> WithContext<'a, Self> {
         WithContext { val: self, ctx }
     }
 }
@@ -171,7 +203,7 @@ pub trait DisplayWithContext {
 #[derive(Debug)]
 pub struct WithContext<'a, T: ?Sized> {
     val: &'a T,
-    ctx: &'a Context,
+    ctx: DisplayContext<'a>,
 }
 
 impl<'a, T: DisplayWithContext> fmt::Display for WithContext<'a, T> {

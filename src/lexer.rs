@@ -2,7 +2,9 @@ use std::{iter::Peekable, ops::Range, str::Chars};
 
 use codespan_reporting::diagnostic::Diagnostic;
 
-use crate::context::{Context, DisplayWithContext, Location, Printable, Printer, StringID};
+use crate::context::{
+    Context, DisplayContext, DisplayWithContext, Location, Printable, Printer, StringID,
+};
 use crate::errors;
 use crate::interner::StringInterner;
 use crate::types::BuiltinType;
@@ -52,7 +54,7 @@ pub enum TokenType {
 }
 
 impl DisplayWithContext for TokenType {
-    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt_with(&self, ctx: DisplayContext<'_>, f: &mut fmt::Formatter) -> fmt::Result {
         use TokenType::*;
 
         match *self {
@@ -72,7 +74,7 @@ impl DisplayWithContext for TokenType {
             Return => write!(f, "return"),
             Var => write!(f, "var"),
             IntLit(i) => write!(f, "{}", i),
-            VarName(id) => write!(f, "{}", ctx.get_string(id)),
+            VarName(id) => write!(f, "{}", ctx.ctx.get_string(id)),
             BuiltinTypeName(b) => write!(f, "{}", b),
         }
     }
@@ -99,7 +101,12 @@ impl Token {
 
 impl Printable for Token {
     fn print<'a>(&self, printer: &mut Printer<'a>) -> errors::Result<()> {
-        write!(printer, "{}\t{:?}", self.token.with_ctx(printer.ctx), self.range)?;
+        write!(
+            printer,
+            "{}\t{:?}",
+            self.token.with_ctx(printer.ctx.into()),
+            self.range
+        )?;
         Ok(())
     }
 }

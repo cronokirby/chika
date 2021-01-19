@@ -3,7 +3,9 @@ use std::ops::Fn;
 use std::{ops::Range, rc::Rc};
 
 use crate::{
-    context::{Context, DisplayWithContext, FileID, Location, Printable, Printer, StringID},
+    context::{
+        Context, DisplayContext, DisplayWithContext, FileID, Location, Printable, Printer, StringID,
+    },
     errors,
     lexer::Token,
     lexer::TokenType,
@@ -143,7 +145,7 @@ pub enum ExprKind {
 }
 
 impl DisplayWithContext for ExprKind {
-    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt_with(&self, ctx: DisplayContext<'_>, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ExprKind::IntLitExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
             ExprKind::VarExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
@@ -172,7 +174,7 @@ impl Expr {
 }
 
 impl DisplayWithContext for Expr {
-    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt_with(&self, ctx: DisplayContext<'_>, f: &mut fmt::Formatter) -> fmt::Result {
         self.kind().fmt_with(ctx, f)
     }
 }
@@ -191,7 +193,7 @@ impl IntLitExpr {
 }
 
 impl DisplayWithContext for IntLitExpr {
-    fn fmt_with(&self, _ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt_with(&self, _ctx: DisplayContext<'_>, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.int_lit())
     }
 }
@@ -211,8 +213,8 @@ impl VarExpr {
 }
 
 impl DisplayWithContext for VarExpr {
-    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", ctx.get_string(self.var()))
+    fn fmt_with(&self, ctx: DisplayContext<'_>, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", ctx.ctx.get_string(self.var()))
     }
 }
 
@@ -233,7 +235,7 @@ pub enum BinOp {
 }
 
 impl DisplayWithContext for BinOp {
-    fn fmt_with(&self, _ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt_with(&self, _ctx: DisplayContext<'_>, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             BinOp::Add => write!(f, "+"),
             BinOp::Mul => write!(f, "*"),
@@ -292,7 +294,7 @@ impl BinExpr {
 }
 
 impl DisplayWithContext for BinExpr {
-    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt_with(&self, ctx: DisplayContext<'_>, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
             "({} {} {})",
@@ -321,7 +323,7 @@ pub enum StatementKind {
 }
 
 impl DisplayWithContext for StatementKind {
-    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt_with(&self, ctx: DisplayContext<'_>, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             StatementKind::ReturnStatement(s) => s.fmt_with(ctx, f),
             StatementKind::VarStatement(s) => s.fmt_with(ctx, f),
@@ -349,7 +351,7 @@ impl Statement {
 }
 
 impl DisplayWithContext for Statement {
-    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt_with(&self, ctx: DisplayContext<'_>, f: &mut fmt::Formatter) -> fmt::Result {
         self.kind().fmt_with(ctx, f)
     }
 }
@@ -367,7 +369,7 @@ impl ReturnStatement {
 }
 
 impl DisplayWithContext for ReturnStatement {
-    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt_with(&self, ctx: DisplayContext<'_>, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "(return {})", self.expr().with_ctx(ctx))
     }
 }
@@ -396,11 +398,11 @@ impl VarStatement {
 }
 
 impl DisplayWithContext for VarStatement {
-    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt_with(&self, ctx: DisplayContext<'_>, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
             "(var {} {} {})",
-            ctx.get_string(self.var()),
+            ctx.ctx.get_string(self.var()),
             self.typ(),
             self.expr().with_ctx(ctx)
         )
@@ -426,11 +428,14 @@ impl BlockStatement {
 }
 
 impl DisplayWithContext for BlockStatement {
-    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt_with(&self, ctx: DisplayContext<'_>, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "(block\n")?;
+        let block_ctx = ctx.indented();
         for i in 0..self.len() {
-            write!(f, "{}\n", self.statement(i).with_ctx(ctx))?;
+            block_ctx.blank_space(f)?;
+            write!(f, "{}\n", self.statement(i).with_ctx(block_ctx))?;
         }
+        ctx.blank_space(f)?;
         write!(f, ")")
     }
 }
@@ -472,7 +477,7 @@ impl IfStatement {
 }
 
 impl DisplayWithContext for IfStatement {
-    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt_with(&self, ctx: DisplayContext<'_>, f: &mut fmt::Formatter) -> fmt::Result {
         if let Some(else_part) = self.else_branch() {
             write!(
                 f,
@@ -509,7 +514,7 @@ impl ExprStatement {
 }
 
 impl DisplayWithContext for ExprStatement {
-    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt_with(&self, ctx: DisplayContext<'_>, f: &mut fmt::Formatter) -> fmt::Result {
         self.expr().fmt_with(ctx, f)
     }
 }
@@ -552,11 +557,11 @@ impl Function {
 }
 
 impl DisplayWithContext for Function {
-    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "(fn {}", ctx.get_string(self.name()))?;
+    fn fmt_with(&self, ctx: DisplayContext<'_>, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(fn {}", ctx.ctx.get_string(self.name()))?;
         for i in 0..self.param_count() {
             let (s, typ) = self.param(i);
-            write!(f, " (: {} {})", ctx.get_string(s), typ)?;
+            write!(f, " (: {} {})", ctx.ctx.get_string(s), typ)?;
         }
         write!(f, " {} {})", self.return_type(), self.body().with_ctx(ctx))
     }
@@ -580,12 +585,14 @@ impl AST {
 }
 
 impl DisplayWithContext for AST {
-    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "(ast")?;
+    fn fmt_with(&self, ctx: DisplayContext<'_>, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(ast\n\n")?;
+        let ctx = ctx.indented();
         for i in 0..self.function_count() {
-            write!(f, "\n\n{}", self.function(i).with_ctx(ctx))?;
+            ctx.blank_space(f)?;
+            write!(f, "{}\n\n", self.function(i).with_ctx(ctx))?;
         }
-        write!(f, "\n\n)")
+        write!(f, ")")
     }
 }
 
@@ -596,7 +603,7 @@ enum Unexpected {
 }
 
 impl DisplayWithContext for Unexpected {
-    fn fmt_with(&self, ctx: &Context, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt_with(&self, ctx: DisplayContext<'_>, f: &mut fmt::Formatter) -> fmt::Result {
         use Unexpected::*;
 
         match self {
@@ -651,7 +658,10 @@ impl Printable for Error {
         let unexpected = self.error.unexpected();
 
         let notes = match self.error {
-            Expected(tok, _) => vec![format!("expected {} instead", tok.with_ctx(printer.ctx))],
+            Expected(tok, _) => vec![format!(
+                "expected {} instead",
+                tok.with_ctx(printer.ctx.into())
+            )],
             ExpectedName(_) => vec![format!("expected name instead")],
             ExpectedIntLit(_) => vec![format!("expected integer instead")],
             ExpectedType(_) => vec![format!("expected type instead")],
@@ -662,7 +672,10 @@ impl Printable for Error {
             ExpectedStatement(_) => vec![format!("trying to parse a statement")],
         };
         let diagnostic = Diagnostic::error()
-            .with_message(format!("Unexpected {}", unexpected.with_ctx(printer.ctx)))
+            .with_message(format!(
+                "Unexpected {}",
+                unexpected.with_ctx(printer.ctx.into())
+            ))
             .with_labels(vec![Label::primary(
                 self.location.file,
                 self.location.range.clone(),

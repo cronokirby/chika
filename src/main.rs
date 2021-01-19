@@ -133,7 +133,7 @@ fn parse_and_stop(input_file: &Path) -> Result<(), Error> {
             return e.print(&mut printer);
         }
     };
-    println!("{}", ast.with_ctx(&ctx));
+    println!("{}", ast.with_ctx((&ctx).into()));
     Ok(())
 }
 
