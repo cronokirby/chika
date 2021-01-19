@@ -995,3 +995,53 @@ pub fn parse(tokens: Vec<Token>, file: FileID, file_size: usize) -> ParseResult<
     let mut parser = Parser::new(file, file_size, tokens);
     parser.ast()
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::lexer::lex;
+
+    fn should_parse(input: &str) {
+        let mut ctx = Context::empty();
+
+        let mut tokens = Vec::new();
+        for res in lex(input, &mut ctx) {
+            match res {
+                Err(e) => assert!(false, "failed to lex {:?}", e),
+                Ok(t) => tokens.push(t),
+            }
+        }
+
+        if let Err(e) = parse(tokens, FileID::dummy(), input.len()) {
+            assert!(false, "failed ot parse {:?}", e)
+        }
+    }
+
+    #[test]
+    fn empty_functions_parse() {
+        should_parse(
+            r#"
+        fn foo(): Unit {}
+
+        fn bar(x: I32): I32 {}
+
+        fn baz(x: I32, y: I32): Unit {}
+        "#,
+        )
+    }
+
+    #[test]
+    fn statements_parse() {
+        should_parse(
+            r#"
+        fn foo(): Unit {
+            var x: I32 = 3;
+            {
+                var y: I32 = 4;
+                4;
+            }
+        }
+        "#,
+        )
+    }
+}

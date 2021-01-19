@@ -77,6 +77,13 @@ pub struct StringID(u32);
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FileID(usize);
 
+impl FileID {
+    /// A dummy file id to use for tests
+    pub fn dummy() -> FileID {
+        FileID(0xBAD)
+    }
+}
+
 #[derive(Debug)]
 pub struct Context {
     table: Vec<String>,
