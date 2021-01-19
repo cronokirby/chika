@@ -5,6 +5,7 @@ mod lexer;
 mod parser;
 mod types;
 
+use crate::context::DisplayWithContext;
 use context::{Context, Printable};
 use errors::Error;
 
@@ -132,7 +133,7 @@ fn parse_and_stop(input_file: &Path) -> Result<(), Error> {
             return e.print(&mut printer);
         }
     };
-    println!("{:#?}", ast);
+    println!("{}", ast.with_ctx(&ctx));
     Ok(())
 }
 
