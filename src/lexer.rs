@@ -109,9 +109,10 @@ impl Printable for Token {
     fn print<'a>(&self, printer: &mut Printer<'a>) -> errors::Result<()> {
         write!(
             printer,
-            "{}\t{:?}",
+            "{}\t{}..{}",
             self.token.with_ctx(printer.ctx.into()),
-            self.location.range
+            self.location.start,
+            self.location.end,
         )?;
         Ok(())
     }
@@ -123,10 +124,10 @@ enum ErrorType {
 }
 
 impl ErrorType {
-    fn at(self, file: FileID, range: Range<usize>) -> Error {
+    fn at(self, file: FileID, start: usize, end: usize) -> Error {
         Error {
             error: self,
-            location: Location::new(file, range),
+            location: Location::new(file, start, end),
         }
     }
 }
@@ -144,10 +145,7 @@ impl Printable for Error {
         let diagnostic = match self.error {
             UnexpectedChar(c) => Diagnostic::error()
                 .with_message(format!("Unexpected Character: `{}`", c))
-                .with_labels(vec![Label::primary(
-                    self.location.file,
-                    self.location.range.clone(),
-                )]),
+                .with_labels(vec![Label::primary(self.location.file, self.location)]),
         };
         printer.write_diagnostic(diagnostic)
     }
@@ -273,13 +271,15 @@ impl<'a> Iterator for Lexer<'a> {
                 }
             }
             c => {
-                return Some(Err(
-                    ErrorType::UnexpectedChar(c).at(self.ctx.main_file, self.start..self.end)
-                ))
+                return Some(Err(ErrorType::UnexpectedChar(c).at(
+                    self.ctx.main_file,
+                    self.start,
+                    self.end,
+                )))
             }
         };
 
-        let loc = Location::new(self.ctx.current_file, self.start..self.end);
+        let loc = Location::new(self.ctx.current_file, self.start, self.end);
         Some(Ok(Token::new(loc, item)))
     }
 }

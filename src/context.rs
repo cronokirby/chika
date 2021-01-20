@@ -281,23 +281,29 @@ pub trait Printable {
 }
 
 /// A location of some item in the source code
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Location {
     /// The file this snippet originates from
     pub file: FileID,
-    /// The range in bytes that this snippet occupies
-    pub range: Range<usize>,
+    pub start: usize,
+    pub end: usize,
 }
 
 impl Location {
     /// Create a new location, from a file, and a range of bytes
-    pub fn new(file: FileID, range: Range<usize>) -> Self {
-        Location { file, range }
+    pub fn new(file: FileID, start: usize, end: usize) -> Self {
+        Location { file, start, end }
     }
 
     /// Create a new location spanning from this location to that location
     pub fn to(&self, that: &Location) -> Self {
         assert_eq!(self.file, that.file);
-        Location::new(self.file, self.range.start..that.range.end)
+        Location::new(self.file, self.start, that.end)
+    }
+}
+
+impl Into<Range<usize>> for Location {
+    fn into(self) -> Range<usize> {
+        self.start..self.end
     }
 }

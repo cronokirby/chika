@@ -1,6 +1,6 @@
 use crate::codespan_reporting::diagnostic::{Diagnostic, Label};
 use std::ops::Fn;
-use std::{ops::Range, rc::Rc};
+use std::rc::Rc;
 
 use crate::{
     context::{DisplayContext, DisplayWithContext, FileID, Location, Printable, Printer, StringID},
@@ -671,10 +671,7 @@ impl Printable for Error {
                 "Unexpected {}",
                 unexpected.with_ctx(printer.ctx.into())
             ))
-            .with_labels(vec![Label::primary(
-                self.location.file,
-                self.location.range.clone(),
-            )])
+            .with_labels(vec![Label::primary(self.location.file, self.location)])
             .with_notes(notes);
         printer.write_diagnostic(diagnostic)
     }
@@ -702,7 +699,7 @@ impl Parser {
     }
 
     fn end_location(&self) -> Location {
-        Location::new(self.file, self.file_size..self.file_size)
+        Location::new(self.file, self.file_size, self.file_size)
     }
 
     fn peek(&self) -> Option<&Token> {
@@ -727,12 +724,12 @@ impl Parser {
     fn expect(&mut self, token: TokenType) -> ParseResult<Location> {
         match self.peek() {
             Some(right) if right.token == token => {
-                let ret = right.location.clone();
+                let ret = right.location;
                 self.next();
                 Ok(ret)
             }
             Some(wrong) => {
-                let loc = wrong.location.clone();
+                let loc = wrong.location;
                 Err(ErrorType::Expected(token, Unexpected::Token(wrong.token)).at(loc))
             }
             None => {
@@ -750,12 +747,12 @@ impl Parser {
         match self.peek() {
             Some(maybe) => match matcher(maybe.token) {
                 Some(ok) => {
-                    let loc = maybe.location.clone();
+                    let loc = maybe.location;
                     self.next();
                     Ok((loc, ok))
                 }
                 None => {
-                    let loc = maybe.location.clone();
+                    let loc = maybe.location;
                     Err(make_error(Unexpected::Token(maybe.token)).at(loc))
                 }
             },
@@ -787,7 +784,7 @@ impl Parser {
                 location,
             }) => {
                 let ret = Rc::new(Node {
-                    location: location.clone(),
+                    location: *location,
                     tag: Tag::IntLitExpr,
                     shape: NodeShape::IntLit(*u),
                 });
@@ -799,7 +796,7 @@ impl Parser {
                 location,
             }) => {
                 let ret = Rc::new(Node {
-                    location: location.clone(),
+                    location: *location,
                     tag: Tag::VarExpr,
                     shape: NodeShape::String(*s),
                 });
@@ -807,8 +804,7 @@ impl Parser {
                 Ok(ret)
             }
             Some(other) => {
-                Err(ErrorType::ExpectedExpr(Unexpected::Token(other.token))
-                    .at(other.location.clone()))
+                Err(ErrorType::ExpectedExpr(Unexpected::Token(other.token)).at(other.location))
             }
             None => {
                 let loc = self.end_location();
@@ -875,7 +871,7 @@ impl Parser {
         branch.push(cond);
 
         let statement = self.statement()?;
-        let statement_loc = statement.location.clone();
+        let statement_loc = statement.location;
         branch.push(statement);
 
         if self.check(Else) {
@@ -996,15 +992,15 @@ impl Parser {
         let mut end = 0;
         while self.check(Fn) {
             let function = self.function()?;
-            let range = &function.location.range;
+            let location = &function.location;
             if let None = start {
-                start = Some(range.start);
+                start = Some(location.start);
             }
-            end = range.end;
+            end = location.end;
 
             functions.push(function);
         }
-        let location = Location::new(self.file, start.unwrap_or(end)..end);
+        let location = Location::new(self.file, start.unwrap_or(end), end);
         let node = Node {
             location,
             tag: Tag::AST,
