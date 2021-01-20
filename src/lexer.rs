@@ -1,6 +1,8 @@
 use std::{iter::Peekable, str::Chars};
 
-use crate::context::{Context, Diagnostic, DisplayContext, DisplayWithContext, Location, StringID};
+use crate::context::{
+    Context, Diagnostic, DisplayContext, DisplayWithContext, IsDiagnostic, Location, StringID,
+};
 use crate::interner::StringInterner;
 use crate::types::BuiltinType;
 use crate::{codespan_reporting::diagnostic::Label, context::FileID};
@@ -131,8 +133,8 @@ pub struct Error {
     error: ErrorType,
 }
 
-impl Into<Diagnostic> for Error {
-    fn into(self) -> Diagnostic {
+impl IsDiagnostic for Error {
+    fn diagnostic(&self, _ctx: &Context) -> Diagnostic {
         use ErrorType::*;
 
         match self.error {

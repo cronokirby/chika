@@ -6,7 +6,7 @@ mod parser;
 mod types;
 
 use crate::context::DisplayWithContext;
-use context::{with_ctx, Context};
+use context::{Context, IsDiagnostic};
 use errors::Error;
 
 use std::io::Write;
@@ -77,7 +77,7 @@ fn lex(ctx: &mut Context) -> Result<Option<Vec<lexer::Token>>, Error> {
         writeln!(&mut out, "Lexer Errors:\n")?;
         out.reset()?;
         for e in errors {
-            ctx.emit_diagnostic(&mut out, &e.into())?;
+            ctx.emit_diagnostic(&mut out, &e.diagnostic(ctx))?;
         }
         return Ok(None);
     }
@@ -126,7 +126,7 @@ fn parse_and_stop(input_file: &Path) -> Result<(), Error> {
             out.set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))?;
             writeln!(out, "Parser Errors:\n")?;
             out.reset()?;
-            return ctx.emit_diagnostic(&mut out, &with_ctx(&e, &ctx).into());
+            return ctx.emit_diagnostic(&mut out, &e.diagnostic(&ctx));
         }
     };
     println!("{}", ast.with_ctx((&ctx).into()));

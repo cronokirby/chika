@@ -226,8 +226,8 @@ pub trait DisplayWithContext {
 /// `DisplayWithContext` trait.
 #[derive(Debug)]
 pub struct WithContext<'a, T: ?Sized> {
-    pub val: &'a T,
-    pub ctx: DisplayContext<'a>,
+    val: &'a T,
+    ctx: DisplayContext<'a>,
 }
 
 impl<'a, T: DisplayWithContext> fmt::Display for WithContext<'a, T> {
@@ -236,15 +236,12 @@ impl<'a, T: DisplayWithContext> fmt::Display for WithContext<'a, T> {
     }
 }
 
-/// Attach a value alongside a context
+/// A trait for items convertible to diagnostics.
 ///
-/// This is useful because sometimes we need a context for certain values,
-/// namely to display strings
-pub fn with_ctx<'a, T: Sized>(val: &'a T, ctx: &'a Context) -> WithContext<'a, T> {
-    WithContext {
-        val,
-        ctx: ctx.into(),
-    }
+/// We don't use Into, simply because we usually need access to the compiler
+/// context in order to perform this conversion.
+pub trait IsDiagnostic {
+    fn diagnostic(&self, ctx: &Context) -> Diagnostic;
 }
 
 /// A location of some item in the source code
