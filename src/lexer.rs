@@ -90,18 +90,18 @@ impl DisplayWithContext for TokenType {
 ///
 /// This includes the range in the source code that the token spans, as well
 /// as the underlying token type.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Token {
-    /// The range in indices that this token spans in the code
-    pub range: Range<usize>,
+    /// The location of this token
+    pub location: Location,
     /// The underlying type of this token
     pub token: TokenType,
 }
 
 impl Token {
-    /// Create a new token from a range and a token type
-    pub fn new(range: Range<usize>, token: TokenType) -> Self {
-        Token { range, token }
+    /// Create a new token from a location and a token type
+    pub fn new(location: Location, token: TokenType) -> Self {
+        Token { location, token }
     }
 }
 
@@ -111,7 +111,7 @@ impl Printable for Token {
             printer,
             "{}\t{:?}",
             self.token.with_ctx(printer.ctx.into()),
-            self.range
+            self.location.range
         )?;
         Ok(())
     }
@@ -279,8 +279,8 @@ impl<'a> Iterator for Lexer<'a> {
             }
         };
 
-        let range = self.start..self.end;
-        Some(Ok(Token::new(range, item)))
+        let loc = Location::new(self.ctx.current_file, self.start..self.end);
+        Some(Ok(Token::new(loc, item)))
     }
 }
 

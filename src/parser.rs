@@ -701,12 +701,8 @@ impl Parser {
         }
     }
 
-    fn location(&self, range: Range<usize>) -> Location {
-        Location::new(self.file, range)
-    }
-
     fn end_location(&self) -> Location {
-        self.location(self.file_size..self.file_size)
+        Location::new(self.file, self.file_size..self.file_size)
     }
 
     fn peek(&self) -> Option<&Token> {
@@ -731,12 +727,12 @@ impl Parser {
     fn expect(&mut self, token: TokenType) -> ParseResult<Location> {
         match self.peek() {
             Some(right) if right.token == token => {
-                let ret = self.location(right.range.clone());
+                let ret = right.location.clone();
                 self.next();
                 Ok(ret)
             }
             Some(wrong) => {
-                let loc = self.location(wrong.range.clone());
+                let loc = wrong.location.clone();
                 Err(ErrorType::Expected(token, Unexpected::Token(wrong.token)).at(loc))
             }
             None => {
@@ -754,12 +750,12 @@ impl Parser {
         match self.peek() {
             Some(maybe) => match matcher(maybe.token) {
                 Some(ok) => {
-                    let loc = self.location(maybe.range.clone());
+                    let loc = maybe.location.clone();
                     self.next();
                     Ok((loc, ok))
                 }
                 None => {
-                    let loc = self.location(maybe.range.clone());
+                    let loc = maybe.location.clone();
                     Err(make_error(Unexpected::Token(maybe.token)).at(loc))
                 }
             },
@@ -788,11 +784,10 @@ impl Parser {
         match self.peek() {
             Some(Token {
                 token: IntLit(u),
-                range,
+                location,
             }) => {
-                let location = self.location(range.clone());
                 let ret = Rc::new(Node {
-                    location,
+                    location: location.clone(),
                     tag: Tag::IntLitExpr,
                     shape: NodeShape::IntLit(*u),
                 });
@@ -801,11 +796,10 @@ impl Parser {
             }
             Some(Token {
                 token: VarName(s),
-                range,
+                location,
             }) => {
-                let location = self.location(range.clone());
                 let ret = Rc::new(Node {
-                    location,
+                    location: location.clone(),
                     tag: Tag::VarExpr,
                     shape: NodeShape::String(*s),
                 });
@@ -813,8 +807,8 @@ impl Parser {
                 Ok(ret)
             }
             Some(other) => {
-                let location = self.location(other.range.clone());
-                Err(ErrorType::ExpectedExpr(Unexpected::Token(other.token)).at(location))
+                Err(ErrorType::ExpectedExpr(Unexpected::Token(other.token))
+                    .at(other.location.clone()))
             }
             None => {
                 let loc = self.end_location();

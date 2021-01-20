@@ -90,6 +90,7 @@ pub struct Context {
     table: Vec<String>,
     files: Vec<File>,
     pub main_file: FileID,
+    pub current_file: FileID,
 }
 
 impl Context {
@@ -98,12 +99,14 @@ impl Context {
             table: Vec::new(),
             files: Vec::new(),
             main_file: FileID(0),
+            current_file: FileID(0),
         }
     }
 
     pub fn with_main_file(path: &Path) -> io::Result<Self> {
         let mut ctx = Self::empty();
         ctx.main_file = ctx.add_file(path)?;
+        ctx.current_file = ctx.main_file;
         Ok(ctx)
     }
 
