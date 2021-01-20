@@ -1,10 +1,12 @@
-use crate::codespan_reporting::diagnostic::{Diagnostic, Label};
+use crate::codespan_reporting::diagnostic::Label;
 use std::ops::Fn;
 use std::rc::Rc;
 
 use crate::{
-    context::{DisplayContext, DisplayWithContext, FileID, Location, Printable, Printer, StringID},
-    errors,
+    context::{
+        with_ctx, Diagnostic, DisplayContext, DisplayWithContext, FileID, Location, StringID,
+        WithContext,
+    },
     lexer::Token,
     lexer::TokenType,
     types::BuiltinType,
@@ -647,17 +649,15 @@ pub struct Error {
     error: ErrorType,
 }
 
-impl Printable for Error {
-    fn print<'a>(&self, printer: &mut Printer<'a>) -> errors::Result<()> {
+impl<'a> Into<Diagnostic> for WithContext<'a, Error> {
+    fn into(self) -> Diagnostic {
         use ErrorType::*;
 
-        let unexpected = self.error.unexpected();
+        let error = self.val.error;
+        let unexpected = error.unexpected();
 
-        let notes = match self.error {
-            Expected(tok, _) => vec![format!(
-                "expected {} instead",
-                tok.with_ctx(printer.ctx.into())
-            )],
+        let notes = match error {
+            Expected(tok, _) => vec![format!("expected {} instead", tok.with_ctx(self.ctx))],
             ExpectedName(_) => vec![format!("expected name instead")],
             ExpectedType(_) => vec![format!("expected type instead")],
             ExpectedExpr(_) => vec![
@@ -666,14 +666,13 @@ impl Printable for Error {
             ],
             ExpectedStatement(_) => vec![format!("trying to parse a statement")],
         };
-        let diagnostic = Diagnostic::error()
-            .with_message(format!(
-                "Unexpected {}",
-                unexpected.with_ctx(printer.ctx.into())
-            ))
-            .with_labels(vec![Label::primary(self.location.file, self.location)])
-            .with_notes(notes);
-        printer.write_diagnostic(diagnostic)
+        Diagnostic::error()
+            .with_message(format!("Unexpected {}", unexpected.with_ctx(self.ctx)))
+            .with_labels(vec![Label::primary(
+                self.val.location.file,
+                self.val.location,
+            )])
+            .with_notes(notes)
     }
 }
 

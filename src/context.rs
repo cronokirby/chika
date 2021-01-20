@@ -6,9 +6,8 @@ use std::path::Path;
 
 use codespan_reporting::files;
 
-use crate::{codespan_reporting::diagnostic::Diagnostic, errors::Error};
-use crate::{codespan_reporting::term, errors};
-use term::termcolor::ColorSpec;
+use crate::codespan_reporting::term;
+use crate::{codespan_reporting::diagnostic, errors::Error};
 use term::termcolor::WriteColor;
 
 #[derive(Debug)]
@@ -85,6 +84,9 @@ impl FileID {
     }
 }
 
+/// A type of diagnostic we use for
+pub type Diagnostic = diagnostic::Diagnostic<FileID>;
+
 #[derive(Debug)]
 pub struct Context {
     table: Vec<String>,
@@ -133,6 +135,17 @@ impl Context {
 
     pub fn file_size(&self, id: FileID) -> Result<usize, files::Error> {
         Ok(self.get_file(id)?.source.len())
+    }
+
+    /// Print out a diagnostic to some terminal capable of writing colors
+    pub fn emit_diagnostic(
+        &self,
+        writer: &mut dyn WriteColor,
+        diagnostic: &Diagnostic,
+    ) -> Result<(), Error> {
+        let config = term::Config::default();
+        term::emit(writer, &config, self, diagnostic)?;
+        Ok(())
     }
 }
 
@@ -213,8 +226,8 @@ pub trait DisplayWithContext {
 /// `DisplayWithContext` trait.
 #[derive(Debug)]
 pub struct WithContext<'a, T: ?Sized> {
-    val: &'a T,
-    ctx: DisplayContext<'a>,
+    pub val: &'a T,
+    pub ctx: DisplayContext<'a>,
 }
 
 impl<'a, T: DisplayWithContext> fmt::Display for WithContext<'a, T> {
@@ -223,61 +236,15 @@ impl<'a, T: DisplayWithContext> fmt::Display for WithContext<'a, T> {
     }
 }
 
-/// A struct that we can use to print the outputs of our compiler.
+/// Attach a value alongside a context
 ///
-/// This has some buffer we can write to, usually the terminal,
-/// but also references a string table, so that we can print String IDs in a nice
-/// way for end-users.
-pub struct Printer<'a> {
-    buf: &'a mut dyn WriteColor,
-    pub ctx: &'a Context,
-}
-
-impl<'a> Printer<'a> {
-    /// Create a new printer from an output buffer and a table
-    pub fn new(buf: &'a mut dyn WriteColor, ctx: &'a Context) -> Self {
-        Self { buf, ctx }
+/// This is useful because sometimes we need a context for certain values,
+/// namely to display strings
+pub fn with_ctx<'a, T: Sized>(val: &'a T, ctx: &'a Context) -> WithContext<'a, T> {
+    WithContext {
+        val,
+        ctx: ctx.into(),
     }
-
-    pub fn write_diagnostic(&mut self, diagnostic: Diagnostic<FileID>) -> Result<(), Error> {
-        let config = term::Config::default();
-        term::emit(self.buf, &config, self.ctx, &diagnostic)?;
-        Ok(())
-    }
-}
-
-impl<'a> io::Write for Printer<'a> {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.buf.write(buf)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.buf.flush()
-    }
-}
-
-impl<'a> WriteColor for Printer<'a> {
-    fn supports_color(&self) -> bool {
-        self.buf.supports_color()
-    }
-
-    fn set_color(&mut self, spec: &ColorSpec) -> io::Result<()> {
-        self.buf.set_color(spec)
-    }
-
-    fn reset(&mut self) -> io::Result<()> {
-        self.buf.reset()
-    }
-}
-
-/// A trait for things that are printable using a Printer.
-///
-/// The difference between this and DisplayWithContext is that
-/// the former composes well, and can be used with "sub-objects". This
-/// trait, on the other hand, is intented to be used for the final object
-/// presented by the compiler.
-pub trait Printable {
-    fn print<'a>(&self, printer: &mut Printer<'a>) -> errors::Result<()>;
 }
 
 /// A location of some item in the source code

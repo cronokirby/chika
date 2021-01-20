@@ -1,10 +1,6 @@
-use std::{iter::Peekable, ops::Range, str::Chars};
+use std::{iter::Peekable, str::Chars};
 
-use codespan_reporting::diagnostic::Diagnostic;
-
-use crate::context::{
-    Context, DisplayContext, DisplayWithContext, Location, Printable, Printer, StringID,
-};
+use crate::context::{Context, Diagnostic, DisplayContext, DisplayWithContext, Location, StringID};
 use crate::errors;
 use crate::interner::StringInterner;
 use crate::types::BuiltinType;
@@ -105,16 +101,15 @@ impl Token {
     }
 }
 
-impl Printable for Token {
-    fn print<'a>(&self, printer: &mut Printer<'a>) -> errors::Result<()> {
+impl DisplayWithContext for Token {
+    fn fmt_with<'a>(&self, ctx: DisplayContext<'a>, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
-            printer,
+            f,
             "{}\t{}..{}",
-            self.token.with_ctx(printer.ctx.into()),
+            self.token.with_ctx(ctx),
             self.location.start,
-            self.location.end,
-        )?;
-        Ok(())
+            self.location.end
+        )
     }
 }
 
@@ -138,16 +133,15 @@ pub struct Error {
     error: ErrorType,
 }
 
-impl Printable for Error {
-    fn print<'a>(&self, printer: &mut Printer<'a>) -> errors::Result<()> {
+impl Into<Diagnostic> for Error {
+    fn into(self) -> Diagnostic {
         use ErrorType::*;
 
-        let diagnostic = match self.error {
+        match self.error {
             UnexpectedChar(c) => Diagnostic::error()
                 .with_message(format!("Unexpected Character: `{}`", c))
                 .with_labels(vec![Label::primary(self.location.file, self.location)]),
-        };
-        printer.write_diagnostic(diagnostic)
+        }
     }
 }
 

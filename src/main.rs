@@ -6,7 +6,7 @@ mod parser;
 mod types;
 
 use crate::context::DisplayWithContext;
-use context::{Context, Printable};
+use context::{with_ctx, Context};
 use errors::Error;
 
 use std::io::Write;
@@ -73,12 +73,11 @@ fn lex(ctx: &mut Context) -> Result<Option<Vec<lexer::Token>>, Error> {
 
     if !errors.is_empty() {
         let mut out = StandardStream::stderr(ColorChoice::Always);
-        let mut printer = context::Printer::new(&mut out, &ctx);
-        printer.set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))?;
-        writeln!(&mut printer, "Lexer Errors:\n")?;
-        printer.reset()?;
+        out.set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))?;
+        writeln!(&mut out, "Lexer Errors:\n")?;
+        out.reset()?;
         for e in errors {
-            e.print(&mut printer)?;
+            ctx.emit_diagnostic(&mut out, &e.into())?;
         }
         return Ok(None);
     }
@@ -101,13 +100,11 @@ fn lex_and_stop(input_file: &Path, debug: bool) -> Result<(), Error> {
         println!("Context:\n{:#?}", &ctx);
     } else {
         let mut stdout = StandardStream::stdout(ColorChoice::Always);
-        let mut printer = context::Printer::new(&mut stdout, &ctx);
-        writeln!(&mut printer, "Tokens:")?;
+        writeln!(stdout, "Tokens:")?;
         for t in tokens {
-            t.print(&mut printer)?;
-            writeln!(&mut printer)?;
+            writeln!(stdout, "{}", t.with_ctx((&ctx).into()))?;
         }
-        printer.flush()?;
+        stdout.flush()?;
     }
     Ok(())
 }
@@ -126,11 +123,10 @@ fn parse_and_stop(input_file: &Path) -> Result<(), Error> {
         Ok(ast) => ast,
         Err(e) => {
             let mut out = StandardStream::stderr(ColorChoice::Always);
-            let mut printer = context::Printer::new(&mut out, &ctx);
-            printer.set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))?;
-            writeln!(&mut printer, "Parser Errors:\n")?;
-            printer.reset()?;
-            return e.print(&mut printer);
+            out.set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))?;
+            writeln!(out, "Parser Errors:\n")?;
+            out.reset()?;
+            return ctx.emit_diagnostic(&mut out, &with_ctx(&e, &ctx).into());
         }
     };
     println!("{}", ast.with_ctx((&ctx).into()));
