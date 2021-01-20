@@ -3,9 +3,7 @@ use std::ops::Fn;
 use std::{ops::Range, rc::Rc};
 
 use crate::{
-    context::{
-        Context, DisplayContext, DisplayWithContext, FileID, Location, Printable, Printer, StringID,
-    },
+    context::{DisplayContext, DisplayWithContext, FileID, Location, Printable, Printer, StringID},
     errors,
     lexer::Token,
     lexer::TokenType,
@@ -617,7 +615,6 @@ impl DisplayWithContext for Unexpected {
 enum ErrorType {
     Expected(TokenType, Unexpected),
     ExpectedName(Unexpected),
-    ExpectedIntLit(Unexpected),
     ExpectedType(Unexpected),
     ExpectedExpr(Unexpected),
     ExpectedStatement(Unexpected),
@@ -637,7 +634,6 @@ impl ErrorType {
         match self {
             Expected(_, u) => *u,
             ExpectedName(u) => *u,
-            ExpectedIntLit(u) => *u,
             ExpectedType(u) => *u,
             ExpectedExpr(u) => *u,
             ExpectedStatement(u) => *u,
@@ -663,7 +659,6 @@ impl Printable for Error {
                 tok.with_ctx(printer.ctx.into())
             )],
             ExpectedName(_) => vec![format!("expected name instead")],
-            ExpectedIntLit(_) => vec![format!("expected integer instead")],
             ExpectedType(_) => vec![format!("expected type instead")],
             ExpectedExpr(_) => vec![
                 format!("trying to parse an expression"),
@@ -1033,6 +1028,7 @@ pub fn parse(tokens: Vec<Token>, file: FileID, file_size: usize) -> ParseResult<
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::context::Context;
     use crate::lexer::lex;
 
     fn should_parse(input: &str) {
