@@ -4,8 +4,7 @@ use std::rc::Rc;
 
 use crate::{
     context::{
-        with_ctx, Diagnostic, DisplayContext, DisplayWithContext, FileID, Location, StringID,
-        WithContext,
+        Diagnostic, DisplayContext, DisplayWithContext, FileID, Location, StringID, WithContext,
     },
     lexer::Token,
     lexer::TokenType,

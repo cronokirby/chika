@@ -1,12 +1,10 @@
 use std::{iter::Peekable, str::Chars};
 
 use crate::context::{Context, Diagnostic, DisplayContext, DisplayWithContext, Location, StringID};
-use crate::errors;
 use crate::interner::StringInterner;
 use crate::types::BuiltinType;
 use crate::{codespan_reporting::diagnostic::Label, context::FileID};
 use std::fmt;
-use std::io::Write;
 
 /// Represents the contents of a given token, letting us separate different variants.
 #[derive(Clone, Copy, Debug, PartialEq)]
