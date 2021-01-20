@@ -102,7 +102,7 @@ fn lex_and_stop(input_file: &Path, debug: bool) -> Result<(), Error> {
         let mut stdout = StandardStream::stdout(ColorChoice::Always);
         writeln!(stdout, "Tokens:")?;
         for t in tokens {
-            writeln!(stdout, "{}", t.with_ctx((&ctx).into()))?;
+            writeln!(stdout, "{}", t.with_ctx(&ctx))?;
         }
         stdout.flush()?;
     }
@@ -129,7 +129,7 @@ fn parse_and_stop(input_file: &Path) -> Result<(), Error> {
             return ctx.emit_diagnostic(&mut out, &e.diagnostic(&ctx));
         }
     };
-    println!("{}", ast.with_ctx((&ctx).into()));
+    println!("{}", ast.with_ctx(&ctx));
     Ok(())
 }
 

@@ -656,7 +656,7 @@ impl IsDiagnostic for Error {
         let unexpected = self.error.unexpected();
 
         let notes = match self.error {
-            Expected(tok, _) => vec![format!("expected {} instead", tok.with_ctx(ctx.into()))],
+            Expected(tok, _) => vec![format!("expected {} instead", tok.with_ctx(ctx))],
             ExpectedName(_) => vec![format!("expected name instead")],
             ExpectedType(_) => vec![format!("expected type instead")],
             ExpectedExpr(_) => vec![
@@ -666,7 +666,7 @@ impl IsDiagnostic for Error {
             ExpectedStatement(_) => vec![format!("trying to parse a statement")],
         };
         Diagnostic::error()
-            .with_message(format!("Unexpected {}", unexpected.with_ctx(ctx.into())))
+            .with_message(format!("Unexpected {}", unexpected.with_ctx(ctx)))
             .with_labels(vec![Label::primary(self.location.file, self.location)])
             .with_notes(notes)
     }

@@ -215,8 +215,11 @@ pub trait DisplayWithContext {
     /// Format a given value using some context
     fn fmt_with<'a>(&self, ctx: DisplayContext<'a>, f: &mut fmt::Formatter) -> fmt::Result;
 
-    fn with_ctx<'a>(&'a self, ctx: DisplayContext<'a>) -> WithContext<'a, Self> {
-        WithContext { val: self, ctx }
+    fn with_ctx<'a, I: Into<DisplayContext<'a>>>(&'a self, ctx: I) -> WithContext<'a, Self> {
+        WithContext {
+            val: self,
+            ctx: ctx.into(),
+        }
     }
 }
 
