@@ -79,6 +79,7 @@ pub struct FileID(usize);
 
 impl FileID {
     /// A dummy file id to use for tests
+    #[cfg(test)]
     pub fn dummy() -> FileID {
         FileID(0xBAD)
     }
