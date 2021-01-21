@@ -1,6 +1,6 @@
 use crate::codespan_reporting::diagnostic::Label;
-use std::rc::Rc;
 use std::ops::Fn;
+use std::rc::Rc;
 
 use crate::{
     context::{
@@ -26,6 +26,7 @@ enum Tag {
     BinExprSub,
     BinExprDiv,
     VarExpr,
+    FunctionExpr,
     ExprStatement,
     ReturnStatement,
     VarStatement,
@@ -142,6 +143,8 @@ pub enum ExprKind {
     VarExpr(VarExpr),
     /// Binary arithmetic, as an expression
     BinExpr(BinExpr),
+    /// A function call, as an expression
+    FunctionExpr(FunctionExpr),
 }
 
 impl DisplayWithContext for ExprKind {
@@ -150,6 +153,7 @@ impl DisplayWithContext for ExprKind {
             ExprKind::IntLitExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
             ExprKind::VarExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
             ExprKind::BinExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
+            ExprKind::FunctionExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
         }
     }
 }
@@ -168,6 +172,7 @@ impl Expr {
             Tag::BinExprSub => BinExpr::sub(self.0.clone()).into(),
             Tag::BinExprMul => BinExpr::mul(self.0.clone()).into(),
             Tag::BinExprDiv => BinExpr::div(self.0.clone()).into(),
+            Tag::FunctionExpr => FunctionExpr(self.0.clone()).into(),
             other => panic!("unexpected tag {:?}", other),
         }
     }
@@ -180,6 +185,40 @@ impl DisplayWithContext for Expr {
 }
 
 impl_has_location!(Expr);
+
+/// A function call, used as an expressi0on
+#[derive(Debug)]
+pub struct FunctionExpr(Rc<Node>);
+
+impl FunctionExpr {
+    /// Get the function name of this expression
+    pub fn function(&self) -> StringID {
+        self.0.branch()[0].string()
+    }
+
+    /// The number of parameters passed to this function
+    pub fn param_count(&self) -> usize {
+        self.0.branch().len() - 1
+    }
+
+    /// The ith param passed to this function
+    pub fn param(&self, i: usize) -> Expr {
+        Expr(self.0.branch()[i + 1].clone())
+    }
+}
+
+impl DisplayWithContext for FunctionExpr {
+    fn fmt_with<'a>(&self, ctx: DisplayContext<'a>, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(call {}", ctx.ctx.get_string(self.function()))?;
+        for i in 0..self.param_count() {
+            write!(f, " {}", self.param(i).with_ctx(ctx))?;
+        }
+        write!(f, ")")
+    }
+}
+
+impl_variant!(ExprKind, FunctionExpr);
+impl_has_location!(FunctionExpr);
 
 /// An integer literal, used as an expression
 #[derive(Debug)]
@@ -785,6 +824,31 @@ impl Parser {
         })
     }
 
+    fn function_call(&mut self, function: StringID, start: Location) -> ParseResult<Rc<Node>> {
+        let mut params = vec![Rc::new(Node {
+            location: start,
+            tag: Tag::Name,
+            shape: NodeShape::String(function),
+        })];
+        self.expect(OpenParens)?;
+
+        if !self.check(CloseParens) {
+            params.push(self.expr()?);
+
+            while self.check(Comma) {
+                self.next();
+                params.push(self.expr()?);
+            }
+        }
+        let end = self.expect(CloseParens)?;
+
+        Ok(Rc::new(Node {
+            location: start.to(&end),
+            tag: Tag::FunctionExpr,
+            shape: NodeShape::Branch(params),
+        }))
+    }
+
     fn atom(&mut self) -> ParseResult<Rc<Node>> {
         let (location, res) = self.extract(ErrorType::ExpectedExpr, |tok| match tok {
             TokenType::VarName(n) => Some(Err(n)),
@@ -792,11 +856,17 @@ impl Parser {
             _ => None,
         })?;
         let node = match res {
-            Err(n) => Rc::new(Node {
-                location,
-                tag: Tag::VarExpr,
-                shape: NodeShape::String(n),
-            }),
+            Err(n) => {
+                if self.check(OpenParens) {
+                    self.function_call(n, location)?
+                } else {
+                    Rc::new(Node {
+                        location,
+                        tag: Tag::VarExpr,
+                        shape: NodeShape::String(n),
+                    })
+                }
+            }
             Ok(i) => Rc::new(Node {
                 location,
                 tag: Tag::IntLitExpr,
@@ -1117,10 +1187,25 @@ mod test {
 
     #[test]
     fn operators_parse() {
-        should_parse(r#"
+        should_parse(
+            r#"
         fn foo(): Unit {
             2 + 3 * (3 + 4 / 5) - 5;
         }
-        "#);
+        "#,
+        );
+    }
+
+    #[test]
+    fn calls_parse() {
+        should_parse(
+            r#"
+        fn foo(): Unit {
+            foo(1, 2);
+            bar(x, y, z);
+            bar();
+        }
+        "#,
+        );
     }
 }
