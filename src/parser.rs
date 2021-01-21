@@ -807,7 +807,14 @@ impl Parser {
     }
 
     fn bin_expr(&mut self, min_prec: u8) -> ParseResult<Rc<Node>> {
-        let mut lhs = self.atom()?;
+        let mut lhs = if self.check(OpenParens) {
+            self.next();
+            let lhs = self.bin_expr(0)?;
+            self.expect(CloseParens)?;
+            lhs
+        } else {
+            self.atom()?
+        };
 
         loop {
             let (l_bp, r_bp, tag) = match self.peek().and_then(|tok| binding_power(tok.token)) {
