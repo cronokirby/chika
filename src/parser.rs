@@ -1033,7 +1033,9 @@ impl Parser {
                             self.errors.push(e);
                             break;
                         }
-                        _ => {}
+                        _ => {
+                            self.next();
+                        }
                     }
                 },
             }
