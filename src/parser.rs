@@ -1114,4 +1114,13 @@ mod test {
         "#,
         )
     }
+
+    #[test]
+    fn operators_parse() {
+        should_parse(r#"
+        fn foo(): Unit {
+            2 + 3 * (3 + 4 / 5) - 5;
+        }
+        "#);
+    }
 }
