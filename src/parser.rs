@@ -1,6 +1,6 @@
 use crate::codespan_reporting::diagnostic::Label;
-use std::ops::Fn;
 use std::rc::Rc;
+use std::{ops::Fn, unimplemented};
 
 use crate::{
     context::{
@@ -674,6 +674,19 @@ impl IsDiagnostic for Error {
 
 pub type ParseResult<T> = Result<T, Error>;
 
+/// Return the binding power of some token, if it's an operator.
+///
+/// For tokens for which this doesn't make sense, this returns None.
+fn binding_power(token: TokenType) -> Option<(u8, u8, Tag)> {
+    match token {
+        Plus => Some((1, 2, Tag::BinExprAdd)),
+        Minus => Some((1, 2, Tag::BinExprSub)),
+        Times => Some((3, 4, Tag::BinExprMul)),
+        Div => Some((3, 4, Tag::BinExprDiv)),
+        _ => None,
+    }
+}
+
 /// Represents a parser, advancing over a series of tokens
 #[derive(Debug)]
 struct Parser {
@@ -772,40 +785,56 @@ impl Parser {
         })
     }
 
-    fn expr(&mut self) -> ParseResult<Rc<Node>> {
-        match self.peek() {
-            Some(Token {
-                token: IntLit(u),
+    fn atom(&mut self) -> ParseResult<Rc<Node>> {
+        let (location, res) = self.extract(ErrorType::ExpectedExpr, |tok| match tok {
+            TokenType::VarName(n) => Some(Err(n)),
+            TokenType::IntLit(i) => Some(Ok(i)),
+            _ => None,
+        })?;
+        let node = match res {
+            Err(n) => Rc::new(Node {
                 location,
-            }) => {
-                let ret = Rc::new(Node {
-                    location: *location,
-                    tag: Tag::IntLitExpr,
-                    shape: NodeShape::IntLit(*u),
-                });
-                self.next();
-                Ok(ret)
-            }
-            Some(Token {
-                token: VarName(s),
+                tag: Tag::VarExpr,
+                shape: NodeShape::String(n),
+            }),
+            Ok(i) => Rc::new(Node {
                 location,
-            }) => {
-                let ret = Rc::new(Node {
-                    location: *location,
-                    tag: Tag::VarExpr,
-                    shape: NodeShape::String(*s),
-                });
-                self.next();
-                Ok(ret)
+                tag: Tag::IntLitExpr,
+                shape: NodeShape::IntLit(i),
+            }),
+        };
+        Ok(node)
+    }
+
+    fn bin_expr(&mut self, min_prec: u8) -> ParseResult<Rc<Node>> {
+        let mut lhs = self.atom()?;
+
+        loop {
+            let (l_bp, r_bp, tag) = match self.peek().and_then(|tok| binding_power(tok.token)) {
+                None => break,
+                Some((l, r, tag)) => (l, r, tag),
+            };
+
+            if l_bp < min_prec {
+                break;
             }
-            Some(other) => {
-                Err(ErrorType::ExpectedExpr(Unexpected::Token(other.token)).at(other.location))
-            }
-            None => {
-                let loc = self.end_location();
-                Err(ErrorType::ExpectedExpr(Unexpected::EndOfInput).at(loc))
-            }
+
+            self.next();
+
+            let rhs = self.bin_expr(r_bp)?;
+
+            lhs = Rc::new(Node {
+                location: lhs.location.to(&rhs.location),
+                tag,
+                shape: NodeShape::Branch(vec![lhs, rhs]),
+            })
         }
+
+        Ok(lhs)
+    }
+
+    fn expr(&mut self) -> ParseResult<Rc<Node>> {
+        self.bin_expr(0)
     }
 
     fn expr_statement(&mut self) -> ParseResult<Rc<Node>> {
