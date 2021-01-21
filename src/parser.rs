@@ -1030,6 +1030,10 @@ impl Parser {
                             token: Semicolon, ..
                         }) => {
                             self.next();
+                            // Don't attempt recovery if we're at the end of the block
+                            if self.check(CloseBrace) {
+                                return Err(e);
+                            }
                             self.errors.push(e);
                             break;
                         }
