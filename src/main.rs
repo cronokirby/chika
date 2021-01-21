@@ -121,12 +121,15 @@ fn parse_and_stop(input_file: &Path) -> Result<(), Error> {
     let res = parser::parse(tokens, ctx.main_file, file_size);
     let ast = match res {
         Ok(ast) => ast,
-        Err(e) => {
+        Err(errors) => {
             let mut out = StandardStream::stderr(ColorChoice::Always);
             out.set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))?;
             writeln!(out, "Parser Errors:\n")?;
             out.reset()?;
-            return ctx.emit_diagnostic(&mut out, &e.diagnostic(&ctx));
+            for e in errors {
+                ctx.emit_diagnostic(&mut out, &e.diagnostic(&ctx))?;
+            }
+            return Ok(());
         }
     };
     println!("{}", ast.with_ctx(&ctx));

@@ -730,6 +730,7 @@ fn binding_power(token: TokenType) -> Option<(u8, u8, Tag)> {
 #[derive(Debug)]
 struct Parser {
     tokens: Vec<Token>,
+    errors: Vec<Error>,
     file: FileID,
     file_size: usize,
     pos: usize,
@@ -739,6 +740,7 @@ impl Parser {
     fn new(file: FileID, file_size: usize, tokens: Vec<Token>) -> Self {
         Parser {
             tokens,
+            errors: Vec::new(),
             file,
             file_size,
             pos: 0,
@@ -751,6 +753,10 @@ impl Parser {
 
     fn peek(&self) -> Option<&Token> {
         self.tokens.get(self.pos)
+    }
+
+    fn done(&self) -> bool {
+        self.peek().is_none()
     }
 
     fn prev(&self) -> &Token {
@@ -1087,12 +1093,21 @@ impl Parser {
         Ok(Rc::new(node))
     }
 
-    fn ast(&mut self) -> ParseResult<AST> {
+    fn ast(&mut self) -> AST {
         let mut functions = Vec::new();
         let mut start = None;
         let mut end = 0;
         while self.check(Fn) {
-            let function = self.function()?;
+            let function = match self.function() {
+                Ok(f) => f,
+                Err(e) => {
+                    self.errors.push(e);
+                    while !self.check(Fn) && !self.done() {
+                        self.next();
+                    }
+                    continue;
+                }
+            };
             let location = &function.location;
             if let None = start {
                 start = Some(location.start);
@@ -1107,13 +1122,18 @@ impl Parser {
             tag: Tag::AST,
             shape: NodeShape::Branch(functions),
         };
-        Ok(AST(Rc::new(node)))
+        AST(Rc::new(node))
     }
 }
 
-pub fn parse(tokens: Vec<Token>, file: FileID, file_size: usize) -> ParseResult<AST> {
+pub fn parse(tokens: Vec<Token>, file: FileID, file_size: usize) -> Result<AST, Vec<Error>> {
     let mut parser = Parser::new(file, file_size, tokens);
-    parser.ast()
+    let ast = parser.ast();
+    if parser.errors.is_empty() {
+        Ok(ast)
+    } else {
+        Err(parser.errors)
+    }
 }
 
 #[cfg(test)]
