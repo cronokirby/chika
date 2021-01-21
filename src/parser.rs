@@ -1,6 +1,6 @@
 use crate::codespan_reporting::diagnostic::Label;
 use std::rc::Rc;
-use std::{ops::Fn, unimplemented};
+use std::ops::Fn;
 
 use crate::{
     context::{
