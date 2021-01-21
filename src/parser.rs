@@ -1016,11 +1016,35 @@ impl Parser {
         }
     }
 
+    fn next_statement(&mut self) -> ParseResult<Rc<Node>> {
+        loop {
+            match self.statement() {
+                Ok(s) => return Ok(s),
+                Err(e) => loop {
+                    match self.peek() {
+                        None => return Err(e),
+                        Some(Token {
+                            token: CloseBrace, ..
+                        }) => return Err(e),
+                        Some(Token {
+                            token: Semicolon, ..
+                        }) => {
+                            self.next();
+                            self.errors.push(e);
+                            break;
+                        }
+                        _ => {}
+                    }
+                },
+            }
+        }
+    }
+
     fn block(&mut self) -> ParseResult<Rc<Node>> {
         let start_loc = self.expect(OpenBrace)?;
         let mut statements = Vec::new();
         while !self.check(CloseBrace) {
-            statements.push(self.statement()?);
+            statements.push(self.next_statement()?);
         }
         let end_loc = self.expect(CloseBrace)?;
         let node = Node {
