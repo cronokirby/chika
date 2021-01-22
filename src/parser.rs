@@ -35,6 +35,8 @@ enum Tag {
     BinExprLessEqual,
     BinExprGreater,
     BinExprGreaterEqual,
+    UnaryExprNegate,
+    UnaryExprNot,
     VarExpr,
     FunctionExpr,
     ExprStatement,
@@ -151,8 +153,10 @@ pub enum ExprKind {
     IntLitExpr(IntLitExpr),
     /// A single variable as an expression
     VarExpr(VarExpr),
-    /// Binary arithmetic, as an expression
+    /// Binary operators, as an expression
     BinExpr(BinExpr),
+    /// Unary operators, as an expression
+    UnaryExpr(UnaryExpr),
     /// A function call, as an expression
     FunctionExpr(FunctionExpr),
 }
@@ -163,6 +167,7 @@ impl DisplayWithContext for ExprKind {
             ExprKind::IntLitExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
             ExprKind::VarExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
             ExprKind::BinExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
+            ExprKind::UnaryExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
             ExprKind::FunctionExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
         }
     }
@@ -245,6 +250,16 @@ impl Expr {
             .into(),
             Tag::BinExprLessEqual => BinExpr {
                 op: BinOp::LessEqual,
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::UnaryExprNegate => UnaryExpr {
+                op: UnaryOp::Negate,
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::UnaryExprNot => UnaryExpr {
+                op: UnaryOp::Not,
                 node: self.0.clone(),
             }
             .into(),
@@ -369,8 +384,8 @@ pub enum BinOp {
     GreaterEqual,
 }
 
-impl DisplayWithContext for BinOp {
-    fn fmt_with(&self, _ctx: DisplayContext<'_>, f: &mut fmt::Formatter) -> fmt::Result {
+impl fmt::Display for BinOp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             BinOp::Add => write!(f, "+"),
             BinOp::Mul => write!(f, "*"),
@@ -415,7 +430,7 @@ impl DisplayWithContext for BinExpr {
         write!(
             f,
             "({} {} {})",
-            self.op.with_ctx(ctx),
+            self.op,
             self.lhs().with_ctx(ctx),
             self.rhs().with_ctx(ctx)
         )
@@ -424,6 +439,46 @@ impl DisplayWithContext for BinExpr {
 
 impl_variant!(ExprKind, BinExpr);
 impl_has_location!(BinExpr, node);
+
+/// A unary operator of some kind
+#[derive(Debug)]
+pub enum UnaryOp {
+    /// Negation of an integer
+    Negate,
+    /// The opposite of a boolean
+    Not,
+}
+
+impl fmt::Display for UnaryOp {
+    fn fmt<'a>(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            UnaryOp::Negate => write!(f, "-"),
+            UnaryOp::Not => write!(f, "!"),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct UnaryExpr {
+    /// The operator being used
+    pub op: UnaryOp,
+    node: Rc<Node>,
+}
+
+impl UnaryExpr {
+    fn expr(&self) -> Expr {
+        Expr(self.node.branch()[0].clone())
+    }
+}
+
+impl DisplayWithContext for UnaryExpr {
+    fn fmt_with<'a>(&self, ctx: DisplayContext<'a>, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({} {})", self.op, self.expr().with_ctx(ctx))
+    }
+}
+
+impl_variant!(ExprKind, UnaryExpr);
+impl_has_location!(UnaryExpr, node);
 
 /// Represents a strongly typed kind of statement
 pub enum StatementKind {
@@ -814,6 +869,17 @@ fn binding_power(token: TokenType) -> Option<(u8, u8, Tag)> {
     }
 }
 
+/// The binding power of some operator as a prefix unary operator
+///
+/// If this token isn't a prefix operaotr, this returns None
+fn prefix_binding_power(token: TokenType) -> Option<((), u8, Tag)> {
+    match token {
+        Minus => Some(((), 20, Tag::UnaryExprNegate)),
+        Bang => Some(((), 20, Tag::UnaryExprNot)),
+        _ => None,
+    }
+}
+
 /// Represents a parser, advancing over a series of tokens
 #[derive(Debug)]
 struct Parser {
@@ -976,6 +1042,16 @@ impl Parser {
             let lhs = self.bin_expr(0)?;
             self.expect(CloseParens)?;
             lhs
+        } else if let Some(((), r_bp, tag)) =
+            self.peek().and_then(|tok| prefix_binding_power(tok.token))
+        {
+            let start_loc = self.next().location;
+            let rhs = self.bin_expr(r_bp)?;
+            Rc::new(Node {
+                location: start_loc.to(&rhs.location),
+                tag,
+                shape: NodeShape::Branch(vec![rhs]),
+            })
         } else {
             self.atom()?
         };
@@ -1351,10 +1427,14 @@ mod test {
 
     #[test]
     fn boolean_operators_parse() {
-        should_parse(r#"
+        should_parse(
+            r#"
         fn foo(): Bool {
             1 != 2 & 3 && 4 || 5 > 6 < 7 <= 8 >= 9 == 10;
+            !3;
+            -4;
         }
-        "#);
+        "#,
+        );
     }
 }
