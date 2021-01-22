@@ -35,6 +35,28 @@ pub enum TokenType {
     Times,
     /// = symbol
     Equals,
+    /// == symbol
+    EqualsEquals,
+    /// ! symbol
+    Bang,
+    /// != symbol
+    BangEquals,
+    /// < symbol
+    Less,
+    /// <= symbol
+    LessEqual,
+    /// > symbol
+    Greater,
+    /// >= symbol
+    GreaterEqual,
+    /// | symbol
+    Or,
+    /// || symbol
+    OrOr,
+    /// & symbol
+    And,
+    /// && symbol
+    AndAnd,
     /// `fn` keyword
     Fn,
     /// `return` keyword
@@ -70,6 +92,17 @@ impl DisplayWithContext for TokenType {
             Div => write!(f, "/"),
             Times => write!(f, "*"),
             Equals => write!(f, "="),
+            EqualsEquals => write!(f, "=="),
+            Bang => write!(f, "!"),
+            BangEquals => write!(f, "!="),
+            Less => write!(f, "<"),
+            LessEqual => write!(f, "<="),
+            Greater => write!(f, ">"),
+            GreaterEqual => write!(f, ">="),
+            Or => write!(f, "|"),
+            OrOr => write!(f, "||"),
+            And => write!(f, "&"),
+            AndAnd => write!(f, "&&"),
             Fn => write!(f, "fn"),
             Return => write!(f, "return"),
             Var => write!(f, "var"),
@@ -239,8 +272,49 @@ impl<'a> Iterator for Lexer<'a> {
             '-' => Minus,
             '/' => Div,
             '*' => Times,
-            '=' => Equals,
             ',' => Comma,
+            '<' => match self.chars.peek() {
+                Some('=') => {
+                    self.next();
+                    LessEqual
+                }
+                _ => Less,
+            },
+            '>' => match self.chars.peek() {
+                Some('=') => {
+                    self.next();
+                    GreaterEqual
+                }
+                _ => Greater,
+            },
+            '=' => match self.chars.peek() {
+                Some('=') => {
+                    self.next();
+                    EqualsEquals
+                }
+                _ => Equals,
+            },
+            '|' => match self.chars.peek() {
+                Some('|') => {
+                    self.next();
+                    OrOr
+                }
+                _ => Or,
+            },
+            '&' => match self.chars.peek() {
+                Some('&') => {
+                    self.next();
+                    AndAnd
+                }
+                _ => And,
+            },
+            '!' => match self.chars.peek() {
+                Some('=') => {
+                    self.next();
+                    BangEquals
+                }
+                _ => Bang,
+            },
             c if c.is_digit(10) => {
                 let lit = self.continue_int_lit(c);
                 IntLit(lit)
@@ -337,5 +411,10 @@ mod test {
     #[test]
     fn if_else_lexes() {
         should_lex("if else")
+    }
+
+    #[test]
+    fn boolean_operators_lex() {
+        should_lex("== != > >= < <= || && | & !");
     }
 }
