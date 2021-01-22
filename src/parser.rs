@@ -25,6 +25,16 @@ enum Tag {
     BinExprMul,
     BinExprSub,
     BinExprDiv,
+    BinExprOr,
+    BinExprAnd,
+    BinExprBitOr,
+    BinExprBitAnd,
+    BinExprEqual,
+    BinExprNotEqual,
+    BinExprLess,
+    BinExprLessEqual,
+    BinExprGreater,
+    BinExprGreaterEqual,
     VarExpr,
     FunctionExpr,
     ExprStatement,
@@ -168,10 +178,76 @@ impl Expr {
         match &self.0.tag {
             Tag::VarExpr => VarExpr(self.0.clone()).into(),
             Tag::IntLitExpr => IntLitExpr(self.0.clone()).into(),
-            Tag::BinExprAdd => BinExpr::add(self.0.clone()).into(),
-            Tag::BinExprSub => BinExpr::sub(self.0.clone()).into(),
-            Tag::BinExprMul => BinExpr::mul(self.0.clone()).into(),
-            Tag::BinExprDiv => BinExpr::div(self.0.clone()).into(),
+            Tag::BinExprAdd => BinExpr {
+                op: BinOp::Add,
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::BinExprSub => BinExpr {
+                op: BinOp::Sub,
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::BinExprMul => BinExpr {
+                op: BinOp::Mul,
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::BinExprDiv => BinExpr {
+                op: BinOp::Div,
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::BinExprAnd => BinExpr {
+                op: BinOp::And,
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::BinExprOr => BinExpr {
+                op: BinOp::Or,
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::BinExprBitAnd => BinExpr {
+                op: BinOp::BitAnd,
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::BinExprBitOr => BinExpr {
+                op: BinOp::BitOr,
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::BinExprEqual => BinExpr {
+                op: BinOp::Equal,
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::BinExprNotEqual => BinExpr {
+                op: BinOp::NotEqual,
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::BinExprGreater => BinExpr {
+                op: BinOp::Greater,
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::BinExprGreaterEqual => BinExpr {
+                op: BinOp::GreaterEqual,
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::BinExprLess => BinExpr {
+                op: BinOp::Less,
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::BinExprLessEqual => BinExpr {
+                op: BinOp::LessEqual,
+                node: self.0.clone(),
+            }
+            .into(),
             Tag::FunctionExpr => FunctionExpr(self.0.clone()).into(),
             other => panic!("unexpected tag {:?}", other),
         }
@@ -271,6 +347,26 @@ pub enum BinOp {
     Sub,
     /// Divide two integers
     Div,
+    /// Bitwise or
+    BitOr,
+    /// Bitwise and
+    BitAnd,
+    /// Boolean or
+    Or,
+    /// Boolean And
+    And,
+    /// Equality
+    Equal,
+    /// Inequality
+    NotEqual,
+    /// Less than
+    Less,
+    /// Less than or equal
+    LessEqual,
+    /// Greater than
+    Greater,
+    /// Greater than or equal
+    GreaterEqual,
 }
 
 impl DisplayWithContext for BinOp {
@@ -280,6 +376,16 @@ impl DisplayWithContext for BinOp {
             BinOp::Mul => write!(f, "*"),
             BinOp::Sub => write!(f, "-"),
             BinOp::Div => write!(f, "/"),
+            BinOp::BitOr => write!(f, "|"),
+            BinOp::BitAnd => write!(f, "&"),
+            BinOp::Or => write!(f, "||"),
+            BinOp::And => write!(f, "&&"),
+            BinOp::Equal => write!(f, "=="),
+            BinOp::NotEqual => write!(f, "!="),
+            BinOp::Less => write!(f, "<"),
+            BinOp::LessEqual => write!(f, "<="),
+            BinOp::Greater => write!(f, ">"),
+            BinOp::GreaterEqual => write!(f, ">="),
         }
     }
 }
@@ -293,34 +399,6 @@ pub struct BinExpr {
 }
 
 impl BinExpr {
-    fn add(node: Rc<Node>) -> Self {
-        BinExpr {
-            op: BinOp::Add,
-            node,
-        }
-    }
-
-    fn sub(node: Rc<Node>) -> Self {
-        BinExpr {
-            op: BinOp::Sub,
-            node,
-        }
-    }
-
-    fn mul(node: Rc<Node>) -> Self {
-        BinExpr {
-            op: BinOp::Mul,
-            node,
-        }
-    }
-
-    fn div(node: Rc<Node>) -> Self {
-        BinExpr {
-            op: BinOp::Div,
-            node,
-        }
-    }
-
     /// The left expression for this operator
     pub fn lhs(&self) -> Expr {
         Expr(self.node.branch()[0].clone())
@@ -718,10 +796,20 @@ pub type ParseResult<T> = Result<T, Error>;
 /// For tokens for which this doesn't make sense, this returns None.
 fn binding_power(token: TokenType) -> Option<(u8, u8, Tag)> {
     match token {
-        Plus => Some((1, 2, Tag::BinExprAdd)),
-        Minus => Some((1, 2, Tag::BinExprSub)),
-        Times => Some((3, 4, Tag::BinExprMul)),
-        Div => Some((3, 4, Tag::BinExprDiv)),
+        OrOr => Some((1, 2, Tag::BinExprOr)),
+        AndAnd => Some((3, 4, Tag::BinExprAnd)),
+        Or => Some((5, 6, Tag::BinExprBitOr)),
+        And => Some((7, 8, Tag::BinExprBitAnd)),
+        EqualsEquals => Some((9, 10, Tag::BinExprEqual)),
+        BangEquals => Some((9, 10, Tag::BinExprNotEqual)),
+        Less => Some((11, 12, Tag::BinExprLess)),
+        LessEqual => Some((11, 12, Tag::BinExprLessEqual)),
+        Greater => Some((11, 12, Tag::BinExprGreater)),
+        GreaterEqual => Some((11, 12, Tag::BinExprGreaterEqual)),
+        Plus => Some((13, 14, Tag::BinExprAdd)),
+        Minus => Some((13, 14, Tag::BinExprSub)),
+        Times => Some((15, 16, Tag::BinExprMul)),
+        Div => Some((17, 18, Tag::BinExprDiv)),
         _ => None,
     }
 }
@@ -1259,5 +1347,14 @@ mod test {
         }
         "#,
         );
+    }
+
+    #[test]
+    fn boolean_operators_parse() {
+        should_parse(r#"
+        fn foo(): Bool {
+            1 != 2 & 3 && 4 || 5 > 6 < 7 <= 8 >= 9 == 10;
+        }
+        "#);
     }
 }
