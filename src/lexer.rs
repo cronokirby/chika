@@ -250,6 +250,7 @@ impl<'a> Iterator for Lexer<'a> {
                 match ident.as_str() {
                     "I32" => BuiltinTypeName(BuiltinType::I32),
                     "Unit" => BuiltinTypeName(BuiltinType::Unit),
+                    "Bool" => BuiltinTypeName(BuiltinType::Bool),
                     _ => panic!("Unknown type: {}", ident),
                 }
             }
@@ -320,7 +321,7 @@ mod test {
 
     #[test]
     fn identifiers_lex() {
-        should_lex("a b foo地3 a34 I32 Unit");
+        should_lex("a b foo地3 a34 I32 Unit Bool");
     }
 
     #[test]

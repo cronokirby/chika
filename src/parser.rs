@@ -1197,6 +1197,8 @@ mod test {
         fn bar(x: I32): I32 {}
 
         fn baz(x: I32, y: I32): Unit {}
+
+        fn boo(x: Bool): Bool {}
         "#,
         )
     }
