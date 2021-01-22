@@ -7,6 +7,8 @@ pub enum BuiltinType {
     I32,
     /// The unit, or void type
     Unit,
+    /// The type of booleans
+    Bool,
 }
 
 impl fmt::Display for BuiltinType {
@@ -16,6 +18,7 @@ impl fmt::Display for BuiltinType {
         match self {
             I32 => write!(f, "I32"),
             Unit => write!(f, "Unit"),
+            Bool => write!(f, "Bool"),
         }
     }
 }
