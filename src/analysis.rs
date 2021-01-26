@@ -22,3 +22,18 @@ impl Function {
         }
     }
 }
+
+/// The information we have about a variable in the program
+#[derive(Debug)]
+pub struct Variable {
+    /// The original name the variable had
+    pub name: StringID,
+    /// The type of this variable
+    pub typ: BuiltinType,
+}
+
+impl Variable {
+    fn new(name: StringID, typ: BuiltinType) -> Self {
+        Variable { name, typ }
+    }
+}
