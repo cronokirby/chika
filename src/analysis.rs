@@ -68,3 +68,33 @@ impl Variable {
         Variable { name, typ }
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VariableID(u32);
+
+#[derive(Debug)]
+pub struct VariableTable {
+    variables: Vec<Variable>,
+}
+
+impl VariableTable {
+    fn new() -> Self {
+        VariableTable {
+            variables: Vec::new(),
+        }
+    }
+
+    fn add_variable(&mut self, variable: Variable) -> VariableID {
+        let id = VariableID(self.variables.len() as u32);
+        self.variables.push(variable);
+        id
+    }
+}
+
+impl Index<VariableID> for VariableTable {
+    type Output = Variable;
+
+    fn index(&self, index: VariableID) -> &Self::Output {
+        &self.variables[index.0 as usize]
+    }
+}
