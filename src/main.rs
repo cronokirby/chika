@@ -63,7 +63,7 @@ fn lex(ctx: &mut Context) -> Result<Option<Vec<lexer::Token>>, Error> {
     let mut tokens = Vec::<lexer::Token>::new();
     let mut errors = Vec::<lexer::Error>::new();
 
-    let source = ctx.source(ctx.main_file).unwrap().to_string();
+    let source = ctx.files.source(ctx.main_file).unwrap().to_string();
     for res in lexer::lex(&source, ctx) {
         match res {
             Ok(tok) => tokens.push(tok),
@@ -117,7 +117,7 @@ fn parse_and_stop(input_file: &Path) -> Result<(), Error> {
         Some(tokens) => tokens,
     };
 
-    let file_size = ctx.file_size(ctx.main_file)?;
+    let file_size = ctx.files.file_size(ctx.main_file)?;
     let res = parser::parse(tokens, ctx.main_file, file_size);
     let ast = match res {
         Ok(ast) => ast,

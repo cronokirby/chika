@@ -1,69 +1,14 @@
+mod files;
+
+pub use files::{FileID, FileTable};
 use std::fmt;
-use std::fs;
 use std::io;
 use std::ops::Range;
 use std::path::Path;
 
-use codespan_reporting::files;
-
 use crate::codespan_reporting::term;
 use crate::{codespan_reporting::diagnostic, errors::Error};
 use term::termcolor::WriteColor;
-
-#[derive(Debug)]
-struct File {
-    name: String,
-    source: String,
-    line_starts: Vec<usize>,
-}
-
-impl File {
-    fn from_path(path: &Path) -> io::Result<Self> {
-        let source = fs::read_to_string(path)?;
-        let name = path.to_string_lossy().to_string();
-
-        let mut line_starts = vec![0];
-        let mut pos = 0;
-        for c in source.bytes() {
-            pos += 1;
-            if c == b'\n' {
-                line_starts.push(pos);
-            }
-        }
-        line_starts.push(pos);
-
-        Ok(File {
-            name,
-            source,
-            line_starts,
-        })
-    }
-
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn source(&self) -> &str {
-        &self.source
-    }
-
-    fn line_index(&self, byte_index: usize) -> Result<usize, files::Error> {
-        match self.line_starts.binary_search(&byte_index) {
-            Ok(line) => Ok(line),
-            Err(next_line) => Ok(next_line - 1),
-        }
-    }
-
-    fn line_range(&self, index: usize) -> Result<Range<usize>, files::Error> {
-        let max = self.line_starts.len() - 2;
-        if index > max {
-            return Err(files::Error::LineTooLarge { given: index, max });
-        }
-        let start = self.line_starts[index];
-        let end = self.line_starts[index + 1];
-        Ok(start..end)
-    }
-}
 
 /// A String ID can be used in place of a string basically everywhere.
 ///
@@ -73,24 +18,13 @@ impl File {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct StringID(u32);
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct FileID(usize);
-
-impl FileID {
-    /// A dummy file id to use for tests
-    #[cfg(test)]
-    pub fn dummy() -> FileID {
-        FileID(0xBAD)
-    }
-}
-
 /// A type of diagnostic we use for
 pub type Diagnostic = diagnostic::Diagnostic<FileID>;
 
 #[derive(Debug)]
 pub struct Context {
     table: Vec<String>,
-    files: Vec<File>,
+    pub files: FileTable,
     pub main_file: FileID,
     pub current_file: FileID,
 }
@@ -99,15 +33,15 @@ impl Context {
     pub fn empty() -> Self {
         Context {
             table: Vec::new(),
-            files: Vec::new(),
-            main_file: FileID(0),
-            current_file: FileID(0),
+            files: FileTable::new(),
+            main_file: FileID::dummy(),
+            current_file: FileID::dummy(),
         }
     }
 
     pub fn with_main_file(path: &Path) -> io::Result<Self> {
         let mut ctx = Self::empty();
-        ctx.main_file = ctx.add_file(path)?;
+        ctx.main_file = ctx.files.add_file(path)?;
         ctx.current_file = ctx.main_file;
         Ok(ctx)
     }
@@ -122,21 +56,6 @@ impl Context {
         &self.table[id.0 as usize]
     }
 
-    pub fn add_file(&mut self, path: &Path) -> io::Result<FileID> {
-        let file = File::from_path(path)?;
-        let id = FileID(self.files.len());
-        self.files.push(file);
-        Ok(id)
-    }
-
-    fn get_file(&self, id: FileID) -> Result<&File, files::Error> {
-        self.files.get(id.0).ok_or(files::Error::FileMissing)
-    }
-
-    pub fn file_size(&self, id: FileID) -> Result<usize, files::Error> {
-        Ok(self.get_file(id)?.source.len())
-    }
-
     /// Print out a diagnostic to some terminal capable of writing colors
     pub fn emit_diagnostic(
         &self,
@@ -144,34 +63,8 @@ impl Context {
         diagnostic: &Diagnostic,
     ) -> Result<(), Error> {
         let config = term::Config::default();
-        term::emit(writer, &config, self, diagnostic)?;
+        term::emit(writer, &config, &self.files, diagnostic)?;
         Ok(())
-    }
-}
-
-impl<'a> files::Files<'a> for Context {
-    type FileId = FileID;
-    type Name = &'a str;
-    type Source = &'a str;
-
-    fn name(&'a self, id: Self::FileId) -> Result<Self::Name, files::Error> {
-        Ok(self.get_file(id)?.name())
-    }
-
-    fn source(&'a self, id: Self::FileId) -> Result<Self::Source, files::Error> {
-        Ok(self.get_file(id)?.source())
-    }
-
-    fn line_index(&'a self, id: Self::FileId, byte_index: usize) -> Result<usize, files::Error> {
-        self.get_file(id)?.line_index(byte_index)
-    }
-
-    fn line_range(
-        &'a self,
-        id: Self::FileId,
-        line_index: usize,
-    ) -> Result<Range<usize>, files::Error> {
-        self.get_file(id)?.line_range(line_index)
     }
 }
 
