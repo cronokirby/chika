@@ -1,4 +1,6 @@
+use crate::parser;
 use crate::{context::StringID, types::BuiltinType};
+use parser::{BinOp, UnaryOp};
 use std::ops::Index;
 
 /// Represents the information we have about some function
@@ -97,4 +99,50 @@ impl Index<VariableID> for VariableTable {
     fn index(&self, index: VariableID) -> &Self::Output {
         &self.variables[index.0 as usize]
     }
+}
+
+/// Represents a kind of expression in our language
+#[derive(Debug)]
+pub enum Expr {
+    /// Calling a function, with a list of arguments
+    FunctionCall(FunctionID, Vec<Expr>),
+    /// Applying some binary operator to two expressions
+    BinExpr(BinOp, Box<Expr>, Box<Expr>),
+    /// Applying some unary operator to some expression
+    UnaryExpr(UnaryOp, Box<Expr>),
+    /// Referencing a variable, to form an expression
+    VarExpr(VariableID),
+    /// An integer literal as an expression
+    IntExpr(u32),
+}
+
+/// Represents a kind of statement in our language
+#[derive(Debug)]
+pub enum Statement {
+    /// A sequence of statements, forming a block
+    Block(Vec<Statement>),
+    /// An expression, using as a statement
+    Expr(Expr),
+    /// Return the value of an expression
+    Return(Expr),
+    /// An if statement, with a possible else branch
+    If(Expr, Box<Statement>, Option<Box<Statement>>),
+    /// Define a new variable, with a given expression as its value
+    Var(VariableID, Expr),
+}
+
+/// A function definition in our AST
+#[derive(Debug)]
+pub struct FunctionDef {
+    /// The identifier for this function
+    pub id: FunctionID,
+    /// The body of this function
+    pub body: Statement,
+}
+
+/// Our syntax tree, which is composed of a sequence of function definitions
+#[derive(Debug)]
+pub struct AST {
+    /// The functions defined in our AST
+    pub functions: Vec<FunctionDef>,
 }
