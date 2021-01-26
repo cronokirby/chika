@@ -1,3 +1,4 @@
+mod analysis;
 mod context;
 mod errors;
 mod interner;
