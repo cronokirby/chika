@@ -1,7 +1,8 @@
 use crate::{context::StringID, types::BuiltinType};
+use std::ops::Index;
 
 /// Represents the information we have about some function
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Function {
     /// The original name of this function
     pub name: StringID,
@@ -23,8 +24,38 @@ impl Function {
     }
 }
 
-/// The information we have about a variable in the program
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FunctionID(u32);
+
 #[derive(Debug)]
+pub struct FunctionTable {
+    functions: Vec<Function>,
+}
+
+impl FunctionTable {
+    fn new() -> Self {
+        FunctionTable {
+            functions: Vec::new(),
+        }
+    }
+
+    fn add_function(&mut self, function: Function) -> FunctionID {
+        let id = FunctionID(self.functions.len() as u32);
+        self.functions.push(function);
+        id
+    }
+}
+
+impl Index<FunctionID> for FunctionTable {
+    type Output = Function;
+
+    fn index(&self, index: FunctionID) -> &Self::Output {
+        &self.functions[index.0 as usize]
+    }
+}
+
+/// The information we have about a variable in the program
+#[derive(Clone, Debug)]
 pub struct Variable {
     /// The original name the variable had
     pub name: StringID,
