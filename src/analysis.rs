@@ -1,6 +1,7 @@
 use crate::parser;
 use crate::{context::StringID, types::BuiltinType};
 use parser::{BinOp, UnaryOp};
+use std::collections::HashMap;
 use std::ops::Index;
 
 /// Represents the information we have about some function
@@ -145,4 +146,50 @@ pub struct FunctionDef {
 pub struct AST {
     /// The functions defined in our AST
     pub functions: Vec<FunctionDef>,
+}
+
+/// A list of nested scopes, allowing us to track variable IDs
+///
+/// The idea is that we're going to keep track of which names map to which
+/// variables in the current scope.
+///
+/// Since we have a nested system of scopes, we can correctly handle temporary shadowing,
+/// where a variable in a scope shadows a variable in an outer scope.
+#[derive(Debug)]
+struct Scopes {
+    scopes: Vec<HashMap<StringID, VariableID>>,
+}
+
+impl Scopes {
+    fn new() -> Self {
+        Scopes { scopes: Vec::new() }
+    }
+
+    /// Enter a new scope, allowing us to temporarily shadow variables
+    fn enter(&mut self) {
+        self.scopes.push(HashMap::new())
+    }
+
+    /// Exit the current scope
+    fn exit(&mut self) {
+        self.scopes.pop();
+    }
+
+    /// Get the variable ID we've assigned to some name.
+    ///
+    /// This will look through all of the scopes to find that value.
+    fn get(&self, string: StringID) -> Option<VariableID> {
+        for scope in self.scopes.iter().rev() {
+            if let Some(v) = scope.get(&string) {
+                return Some(*v);
+            }
+        }
+        None
+    }
+
+    /// Assign an ID to some name in the current scope
+    fn put(&mut self, string: StringID, var: VariableID) {
+        let last = self.scopes.last_mut().expect("No active scope");
+        last.insert(string, var);
+    }
 }

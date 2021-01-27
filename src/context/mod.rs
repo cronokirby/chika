@@ -15,7 +15,7 @@ use term::termcolor::WriteColor;
 /// The idea is that each unique String ID corresponds to an original string
 /// in the source code. The advantage of using IDs is that comparison is much faster,
 /// and they use up much less space.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct StringID(u32);
 
 /// A type of diagnostic we use for
