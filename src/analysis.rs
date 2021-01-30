@@ -193,3 +193,9 @@ impl Scopes {
         last.insert(string, var);
     }
 }
+
+/// Represents an error that can occurr when analyzing the parsed AST
+pub enum AnalysisError {}
+
+/// A result type containing an error from analysis
+pub type AnalysisResult<T> = Result<T, AnalysisError>;
