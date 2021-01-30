@@ -1,6 +1,6 @@
 use crate::parser;
 use crate::{context::StringID, types::BuiltinType};
-use parser::{BinOp, ExprStatement, ReturnStatement, StatementKind, UnaryOp};
+use parser::{BinOp, ExprKind, ExprStatement, ReturnStatement, StatementKind, UnaryExpr, UnaryOp};
 use std::collections::HashMap;
 use std::ops::Index;
 
@@ -220,6 +220,36 @@ impl Analyzer {
             function_table: FunctionTable::new(),
             variable_table: VariableTable::new(),
             scopes: Scopes::new(),
+        }
+    }
+
+    fn bin_expr(&mut self, expr: parser::BinExpr) -> AnalysisResult<Expr> {
+        unimplemented!()
+    }
+
+    fn function_expr(&mut self, expr: parser::FunctionExpr) -> AnalysisResult<Expr> {
+        unimplemented!()
+    }
+
+    fn int_lit_expr(&mut self, expr: parser::IntLitExpr) -> AnalysisResult<Expr> {
+        unimplemented!()
+    }
+
+    fn unary_expr(&mut self, expr: parser::UnaryExpr) -> AnalysisResult<Expr> {
+        unimplemented!()
+    }
+
+    fn var_expr(&mut self, expr: parser::VarExpr) -> AnalysisResult<Expr> {
+        unimplemented!()
+    }
+
+    fn expr(&mut self, expr: parser::Expr) -> AnalysisResult<Expr> {
+        match expr.kind() {
+            ExprKind::BinExpr(expr) => self.bin_expr(expr),
+            ExprKind::FunctionExpr(expr) => self.function_expr(expr),
+            ExprKind::IntLitExpr(expr) => self.int_lit_expr(expr),
+            ExprKind::UnaryExpr(expr) => self.unary_expr(expr),
+            ExprKind::VarExpr(expr) => self.var_expr(expr),
         }
     }
 
