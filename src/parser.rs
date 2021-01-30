@@ -710,17 +710,17 @@ impl Function {
     }
 
     /// The body of this function
-    fn body(&self) -> BlockStatement {
+    pub fn body(&self) -> BlockStatement {
         BlockStatement(self.0.branch().last().unwrap().clone())
     }
 
     /// The number of parameters to this function
-    fn param_count(&self) -> usize {
+    pub fn param_count(&self) -> usize {
         (self.0.branch().len() - 3) / 2
     }
 
     /// The ith parameter to this function
-    fn param(&self, i: usize) -> (StringID, BuiltinType) {
+    pub fn param(&self, i: usize) -> (StringID, BuiltinType) {
         let j = 2 * i + 1;
         let string = self.0.branch()[j].string();
         let typ = self.0.branch()[j + 1].typ();
