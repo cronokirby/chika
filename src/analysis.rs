@@ -1,12 +1,14 @@
-use crate::{context::StringID, types::BuiltinType};
 use crate::{
     context::{Context, Diagnostic, IsDiagnostic, Location},
     parser,
 };
-use codespan_reporting::diagnostic::Label;
-use parser::{
-    BinOp, ExprKind, ExprStatement, HasLocation, ReturnStatement, StatementKind, UnaryExpr, UnaryOp,
+use crate::{
+    context::{DisplayContext, DisplayWithContext, StringID},
+    types::BuiltinType,
 };
+use codespan_reporting::diagnostic::Label;
+use core::fmt;
+use parser::{BinOp, ExprKind, HasLocation, StatementKind, UnaryOp};
 use std::collections::HashMap;
 use std::ops::Index;
 
@@ -33,8 +35,30 @@ impl Function {
     }
 }
 
+impl DisplayWithContext for Function {
+    fn fmt_with<'a>(&self, ctx: DisplayContext<'a>, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "fn {}(", ctx.ctx.get_string(self.name))?;
+        let mut first = true;
+        for arg in &self.arg_types {
+            if first {
+                first = false;
+                write!(f, "{}", arg)?;
+            } else {
+                write!(f, ", {}", arg)?;
+            }
+        }
+        write!(f, "): {}", self.return_type)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FunctionID(u32);
+
+impl fmt::Display for FunctionID {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "f{}", self.0)
+    }
+}
 
 #[derive(Debug)]
 pub struct FunctionTable {
@@ -63,6 +87,16 @@ impl Index<FunctionID> for FunctionTable {
     }
 }
 
+impl DisplayWithContext for FunctionTable {
+    fn fmt_with<'a>(&self, ctx: DisplayContext<'a>, f: &mut fmt::Formatter) -> fmt::Result {
+        for (i, function) in self.functions.iter().enumerate() {
+            let id = FunctionID(i as u32);
+            writeln!(f, "{}: {}", id, function.with_ctx(ctx))?;
+        }
+        Ok(())
+    }
+}
+
 /// The information we have about a variable in the program
 #[derive(Clone, Debug)]
 pub struct Variable {
@@ -78,8 +112,20 @@ impl Variable {
     }
 }
 
+impl DisplayWithContext for Variable {
+    fn fmt_with<'a>(&self, ctx: DisplayContext<'a>, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} {}", ctx.ctx.get_string(self.name), self.typ)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct VariableID(u32);
+
+impl fmt::Display for VariableID {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "x{}", self.0)
+    }
+}
 
 #[derive(Debug)]
 pub struct VariableTable {
@@ -108,6 +154,16 @@ impl Index<VariableID> for VariableTable {
     }
 }
 
+impl DisplayWithContext for VariableTable {
+    fn fmt_with<'a>(&self, ctx: DisplayContext<'a>, f: &mut fmt::Formatter) -> fmt::Result {
+        for (i, variable) in self.variables.iter().enumerate() {
+            let id = VariableID(i as u32);
+            writeln!(f, "{}: {}", id, variable.with_ctx(ctx))?;
+        }
+        Ok(())
+    }
+}
+
 /// Represents a kind of expression in our language
 #[derive(Debug)]
 pub enum Expr {
@@ -121,6 +177,26 @@ pub enum Expr {
     VarExpr(VariableID),
     /// An integer literal as an expression
     IntExpr(u32),
+}
+
+impl fmt::Display for Expr {
+    fn fmt<'a>(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Expr::IntExpr(i) => write!(f, "{}", i),
+            Expr::BinExpr(op, l, r) => {
+                write!(f, "({} {} {})", op, l, r)
+            }
+            Expr::UnaryExpr(op, e) => write!(f, "({} {})", op, e),
+            Expr::VarExpr(v) => write!(f, "{}", v),
+            Expr::FunctionCall(func, params) => {
+                write!(f, "({}", func)?;
+                for p in params {
+                    write!(f, " {}", p)?;
+                }
+                write!(f, ")")
+            }
+        }
+    }
 }
 
 /// Represents a kind of statement in our language
@@ -138,6 +214,35 @@ pub enum Statement {
     Var(VariableID, Expr),
 }
 
+impl DisplayWithContext for Statement {
+    fn fmt_with<'a>(&self, ctx: DisplayContext<'a>, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Statement::Expr(e) => write!(f, "{}", e),
+            Statement::Return(e) => write!(f, "return {}", e),
+            Statement::Var(v, e) => write!(f, "var {} = {}", v, e),
+            Statement::If(cond, if_branch, else_branch) => match else_branch {
+                None => write!(f, "(if {} {})", cond, if_branch.with_ctx(ctx)),
+                Some(branch) => write!(
+                    f,
+                    "(if {} {} {})",
+                    cond,
+                    if_branch.with_ctx(ctx),
+                    branch.with_ctx(ctx)
+                ),
+            },
+            Statement::Block(statements) => {
+                write!(f, "{{\n")?;
+                let ctx = ctx.indented();
+                for s in statements {
+                    ctx.blank_space(f)?;
+                    write!(f, "{};\n", s.with_ctx(ctx))?;
+                }
+                write!(f, "}}\n")
+            }
+        }
+    }
+}
+
 /// A function definition in our AST
 #[derive(Debug)]
 pub struct FunctionDef {
@@ -145,6 +250,12 @@ pub struct FunctionDef {
     pub id: FunctionID,
     /// The body of this function
     pub body: Statement,
+}
+
+impl DisplayWithContext for FunctionDef {
+    fn fmt_with<'a>(&self, ctx: DisplayContext<'a>, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "fn {} {}", self.id, self.body.with_ctx(ctx))
+    }
 }
 
 /// Our syntax tree, which is composed of a sequence of function definitions
@@ -156,6 +267,16 @@ pub struct AST {
     pub function_table: FunctionTable,
     /// Information about the variables in our program
     pub variable_table: VariableTable,
+}
+
+impl DisplayWithContext for AST {
+    fn fmt_with<'a>(&self, ctx: DisplayContext<'a>, f: &mut fmt::Formatter) -> fmt::Result {
+        for func in &self.functions {
+            writeln!(f, "{}", func.with_ctx(ctx))?;
+        }
+        writeln!(f, "Functions:\n{}", self.function_table.with_ctx(ctx))?;
+        writeln!(f, "Variables:\n{}", self.variable_table.with_ctx(ctx))
+    }
 }
 
 /// A list of nested scopes, allowing us to track variable IDs

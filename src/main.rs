@@ -155,8 +155,7 @@ fn typecheck_and_stop(input_file: &Path) -> Result<(), Error> {
 
     match analyze(&ast) {
         Ok(ast) => {
-            println!("{:#?}", ast);
-            println!("{:#?}", ctx);
+            println!("{}", (&ast).with_ctx(&ctx));
         }
         Err(e) => {
             let mut out = StandardStream::stderr(ColorChoice::Always);
