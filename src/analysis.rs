@@ -248,13 +248,25 @@ impl DisplayWithContext for Statement {
 pub struct FunctionDef {
     /// The identifier for this function
     pub id: FunctionID,
+    /// The arguments passed to this function
+    pub args: Vec<VariableID>,
     /// The body of this function
     pub body: Statement,
 }
 
 impl DisplayWithContext for FunctionDef {
     fn fmt_with<'a>(&self, ctx: DisplayContext<'a>, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "fn {} {}", self.id, self.body.with_ctx(ctx))
+        write!(f, "fn {}(", self.id)?;
+        let mut first = true;
+        for arg in &self.args {
+            if first {
+                first = false;
+                write!(f, "{}", arg)?;
+            } else {
+                write!(f, ", {}", arg)?;
+            }
+        }
+        write!(f, ") {}", self.body.with_ctx(ctx))
     }
 }
 
@@ -490,6 +502,7 @@ impl Analyzer {
             return Err(ErrorType::FunctionRedefinition(name).at(function.location().clone()));
         }
         self.scopes.enter();
+        let mut args = Vec::new();
         let mut arg_types = Vec::new();
         // This scheme allows parameters to shadow preceding ones.
         // The rationale is that this is similar to var statements inside a function
@@ -498,6 +511,7 @@ impl Analyzer {
             let var = Variable::new(name, typ);
             let var_id = self.variable_table.add_variable(var);
             self.scopes.put(name, var_id);
+            args.push(var_id);
             arg_types.push(typ);
         }
         let ret_type = function.return_type();
@@ -507,7 +521,7 @@ impl Analyzer {
         self.function_ids.insert(name, id);
         let body = self.block_statement(function.body())?;
         self.scopes.exit();
-        Ok(FunctionDef { id, body })
+        Ok(FunctionDef { id, args, body })
     }
 
     fn run(mut self, ast: &parser::AST) -> AnalysisResult<AST> {
