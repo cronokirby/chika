@@ -205,7 +205,7 @@ impl Scopes {
 }
 
 /// Represents an error that can occurr when analyzing the parsed AST
-pub enum ErrorType {
+enum ErrorType {
     FunctionRedefinition(StringID),
     UndefinedVar(StringID),
     UndefinedFunction(StringID),
@@ -220,7 +220,7 @@ impl ErrorType {
     }
 }
 
-struct Error {
+pub struct Error {
     location: Location,
     error: ErrorType,
 }
