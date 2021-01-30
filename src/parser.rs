@@ -509,7 +509,7 @@ impl DisplayWithContext for StatementKind {
 pub struct Statement(Rc<Node>);
 
 impl Statement {
-    fn kind(&self) -> StatementKind {
+    pub fn kind(&self) -> StatementKind {
         match &self.0.tag {
             Tag::ReturnStatement => ReturnStatement(self.0.clone()).into(),
             Tag::VarStatement => VarStatement(self.0.clone()).into(),

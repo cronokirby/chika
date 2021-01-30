@@ -1,6 +1,6 @@
 use crate::parser;
 use crate::{context::StringID, types::BuiltinType};
-use parser::{BinOp, UnaryOp};
+use parser::{BinOp, ExprStatement, ReturnStatement, StatementKind, UnaryOp};
 use std::collections::HashMap;
 use std::ops::Index;
 
@@ -223,6 +223,42 @@ impl Analyzer {
         }
     }
 
+    fn block_statement(
+        &mut self,
+        block_statement: parser::BlockStatement,
+    ) -> AnalysisResult<Statement> {
+        unimplemented!()
+    }
+
+    fn expr_statement(&mut self, statement: parser::ExprStatement) -> AnalysisResult<Statement> {
+        unimplemented!()
+    }
+
+    fn if_statement(&mut self, statement: parser::IfStatement) -> AnalysisResult<Statement> {
+        unimplemented!()
+    }
+
+    fn var_statement(&mut self, statement: parser::VarStatement) -> AnalysisResult<Statement> {
+        unimplemented!()
+    }
+
+    fn return_statement(
+        &mut self,
+        statement: parser::ReturnStatement,
+    ) -> AnalysisResult<Statement> {
+        unimplemented!()
+    }
+
+    fn statement(&mut self, statement: parser::Statement) -> AnalysisResult<Statement> {
+        match statement.kind() {
+            StatementKind::BlockStatement(block) => self.block_statement(block),
+            StatementKind::ExprStatement(expr) => self.expr_statement(expr),
+            StatementKind::IfStatement(statement) => self.if_statement(statement),
+            StatementKind::VarStatement(statement) => self.var_statement(statement),
+            StatementKind::ReturnStatement(statement) => self.return_statement(statement),
+        }
+    }
+
     fn function(&mut self, function: parser::Function) -> AnalysisResult<FunctionDef> {
         let name = function.name();
         if self.function_ids.contains_key(&name) {
@@ -244,11 +280,9 @@ impl Analyzer {
             .function_table
             .add_function(Function::new(name, ret_type, arg_types));
         self.function_ids.insert(name, id);
+        let body = self.block_statement(function.body())?;
         self.scopes.exit();
-        Ok(FunctionDef {
-            id,
-            body: unimplemented!(),
-        })
+        Ok(FunctionDef { id, body })
     }
 
     fn run(mut self, ast: &parser::AST) -> AnalysisResult<AST> {
