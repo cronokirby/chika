@@ -340,6 +340,7 @@ impl Analyzer {
         let var = statement.var();
         let typ = statement.typ();
         let id = self.variable_table.add_variable(Variable::new(var, typ));
+        self.scopes.put(var, id);
         let expr = self.expr(statement.expr())?;
         Ok(Statement::Var(id, expr))
     }
