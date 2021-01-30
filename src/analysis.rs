@@ -201,6 +201,8 @@ impl Scopes {
 /// Represents an error that can occurr when analyzing the parsed AST
 pub enum AnalysisError {
     FunctionRedefinition(StringID),
+    UndefinedVar(StringID),
+    UndefinedFunction(StringID),
 }
 
 /// A result type containing an error from analysis
@@ -224,23 +226,40 @@ impl Analyzer {
     }
 
     fn bin_expr(&mut self, expr: parser::BinExpr) -> AnalysisResult<Expr> {
-        unimplemented!()
+        let lhs = self.expr(expr.lhs())?;
+        let rhs = self.expr(expr.rhs())?;
+        Ok(Expr::BinExpr(expr.op, Box::new(lhs), Box::new(rhs)))
     }
 
     fn function_expr(&mut self, expr: parser::FunctionExpr) -> AnalysisResult<Expr> {
-        unimplemented!()
+        let name = expr.function();
+        let &id = self
+            .function_ids
+            .get(&name)
+            .ok_or(AnalysisError::UndefinedFunction(name))?;
+        let mut params = Vec::new();
+        for i in 0..expr.param_count() {
+            params.push(self.expr(expr.param(i))?);
+        }
+        Ok(Expr::FunctionCall(id, params))
     }
 
     fn int_lit_expr(&mut self, expr: parser::IntLitExpr) -> AnalysisResult<Expr> {
-        unimplemented!()
+        Ok(Expr::IntExpr(expr.int_lit()))
     }
 
     fn unary_expr(&mut self, expr: parser::UnaryExpr) -> AnalysisResult<Expr> {
-        unimplemented!()
+        let operand = self.expr(expr.expr())?;
+        Ok(Expr::UnaryExpr(expr.op, Box::new(operand)))
     }
 
     fn var_expr(&mut self, expr: parser::VarExpr) -> AnalysisResult<Expr> {
-        unimplemented!()
+        let name = expr.var();
+        let id = self
+            .scopes
+            .get(name)
+            .ok_or(AnalysisError::UndefinedVar(name))?;
+        Ok(Expr::VarExpr(id))
     }
 
     fn expr(&mut self, expr: parser::Expr) -> AnalysisResult<Expr> {

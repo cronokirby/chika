@@ -466,7 +466,7 @@ pub struct UnaryExpr {
 }
 
 impl UnaryExpr {
-    fn expr(&self) -> Expr {
+    pub fn expr(&self) -> Expr {
         Expr(self.node.branch()[0].clone())
     }
 }
