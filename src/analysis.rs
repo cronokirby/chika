@@ -146,6 +146,10 @@ pub struct FunctionDef {
 pub struct AST {
     /// The functions defined in our AST
     pub functions: Vec<FunctionDef>,
+    /// Information about the functions in our program
+    pub function_table: FunctionTable,
+    /// Information about the variables in our program
+    pub variable_table: VariableTable,
 }
 
 /// A list of nested scopes, allowing us to track variable IDs
@@ -195,7 +199,72 @@ impl Scopes {
 }
 
 /// Represents an error that can occurr when analyzing the parsed AST
-pub enum AnalysisError {}
+pub enum AnalysisError {
+    FunctionRedefinition(StringID),
+}
 
 /// A result type containing an error from analysis
 pub type AnalysisResult<T> = Result<T, AnalysisError>;
+
+struct Analyzer {
+    function_ids: HashMap<StringID, FunctionID>,
+    function_table: FunctionTable,
+    variable_table: VariableTable,
+    scopes: Scopes,
+}
+
+impl Analyzer {
+    fn new() -> Self {
+        Analyzer {
+            function_ids: HashMap::new(),
+            function_table: FunctionTable::new(),
+            variable_table: VariableTable::new(),
+            scopes: Scopes::new(),
+        }
+    }
+
+    fn function(&mut self, function: parser::Function) -> AnalysisResult<FunctionDef> {
+        let name = function.name();
+        if self.function_ids.contains_key(&name) {
+            return Err(AnalysisError::FunctionRedefinition(name));
+        }
+        self.scopes.enter();
+        let mut arg_types = Vec::new();
+        // This scheme allows parameters to shadow preceding ones.
+        // The rationale is that this is similar to var statements inside a function
+        for i in 0..function.param_count() {
+            let (name, typ) = function.param(i);
+            let var = Variable::new(name, typ);
+            let var_id = self.variable_table.add_variable(var);
+            self.scopes.put(name, var_id);
+            arg_types.push(typ);
+        }
+        let ret_type = function.return_type();
+        let id = self
+            .function_table
+            .add_function(Function::new(name, ret_type, arg_types));
+        self.function_ids.insert(name, id);
+        self.scopes.exit();
+        Ok(FunctionDef {
+            id,
+            body: unimplemented!(),
+        })
+    }
+
+    fn run(mut self, ast: &parser::AST) -> AnalysisResult<AST> {
+        let mut functions = Vec::new();
+        for i in 0..ast.function_count() {
+            let function = ast.function(i);
+            functions.push(self.function(function)?);
+        }
+        Ok(AST {
+            functions,
+            function_table: self.function_table,
+            variable_table: self.variable_table,
+        })
+    }
+}
+
+pub fn analyze(ast: &parser::AST) -> AnalysisResult<AST> {
+    Analyzer::new().run(ast)
+}
