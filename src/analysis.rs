@@ -272,30 +272,46 @@ impl Analyzer {
         }
     }
 
-    fn block_statement(
-        &mut self,
-        block_statement: parser::BlockStatement,
-    ) -> AnalysisResult<Statement> {
-        unimplemented!()
+    fn block_statement(&mut self, block: parser::BlockStatement) -> AnalysisResult<Statement> {
+        self.scopes.enter();
+        let mut statements = Vec::new();
+        for i in 0..block.len() {
+            let statement = self.statement(block.statement(i))?;
+            statements.push(statement);
+        }
+        self.scopes.exit();
+        Ok(Statement::Block(statements))
     }
 
     fn expr_statement(&mut self, statement: parser::ExprStatement) -> AnalysisResult<Statement> {
-        unimplemented!()
+        let expr = self.expr(statement.expr())?;
+        Ok(Statement::Expr(expr))
     }
 
     fn if_statement(&mut self, statement: parser::IfStatement) -> AnalysisResult<Statement> {
-        unimplemented!()
+        let cond = self.expr(statement.cond())?;
+        let if_branch = self.statement(statement.if_branch())?;
+        let else_branch = match statement.else_branch() {
+            None => None,
+            Some(branch) => Some(Box::new(self.statement(branch)?)),
+        };
+        Ok(Statement::If(cond, Box::new(if_branch), else_branch))
     }
 
     fn var_statement(&mut self, statement: parser::VarStatement) -> AnalysisResult<Statement> {
-        unimplemented!()
+        let var = statement.var();
+        let typ = statement.typ();
+        let id = self.variable_table.add_variable(Variable::new(var, typ));
+        let expr = self.expr(statement.expr())?;
+        Ok(Statement::Var(id, expr))
     }
 
     fn return_statement(
         &mut self,
         statement: parser::ReturnStatement,
     ) -> AnalysisResult<Statement> {
-        unimplemented!()
+        let expr = self.expr(statement.expr())?;
+        Ok(Statement::Return(expr))
     }
 
     fn statement(&mut self, statement: parser::Statement) -> AnalysisResult<Statement> {

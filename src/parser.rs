@@ -594,7 +594,7 @@ impl BlockStatement {
     }
 
     /// The ith statement in this block
-    fn statement(&self, i: usize) -> Statement {
+    pub fn statement(&self, i: usize) -> Statement {
         Statement(self.0.branch()[i].clone())
     }
 }
