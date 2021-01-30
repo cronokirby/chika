@@ -7,6 +7,7 @@ mod parser;
 mod types;
 
 use crate::context::DisplayWithContext;
+use analysis::analyze;
 use context::{Context, IsDiagnostic};
 use errors::Error;
 
@@ -34,12 +35,6 @@ enum Command {
     /// Print the AST produced by the parser
     Parse {
         /// The file containing Chika code you want to parse
-        #[structopt(name = "INPUT_FILE", parse(from_os_str))]
-        input_file: PathBuf,
-    },
-    /// Print the simplified AST
-    Simplify {
-        /// The file containing Chika code you want to simplify
         #[structopt(name = "INPUT_FILE", parse(from_os_str))]
         input_file: PathBuf,
     },
@@ -110,18 +105,11 @@ fn lex_and_stop(input_file: &Path, debug: bool) -> Result<(), Error> {
     Ok(())
 }
 
-fn parse_and_stop(input_file: &Path) -> Result<(), Error> {
-    let mut ctx = Context::with_main_file(input_file)?;
-
-    let tokens = match lex(&mut ctx)? {
-        None => return Ok(()),
-        Some(tokens) => tokens,
-    };
-
+fn parse(ctx: &Context, tokens: Vec<lexer::Token>) -> Result<Option<parser::AST>, Error> {
     let file_size = ctx.files.file_size(ctx.main_file)?;
     let res = parser::parse(tokens, ctx.main_file, file_size);
-    let ast = match res {
-        Ok(ast) => ast,
+    match res {
+        Ok(ast) => Ok(Some(ast)),
         Err(errors) => {
             let mut out = StandardStream::stderr(ColorChoice::Always);
             out.set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))?;
@@ -130,10 +118,54 @@ fn parse_and_stop(input_file: &Path) -> Result<(), Error> {
             for e in errors {
                 ctx.emit_diagnostic(&mut out, &e.diagnostic(&ctx))?;
             }
-            return Ok(());
+            Ok(None)
+        }
+    }
+}
+
+fn parse_and_stop(input_file: &Path) -> Result<(), Error> {
+    let mut ctx = Context::with_main_file(input_file)?;
+
+    let tokens = match lex(&mut ctx)? {
+        None => return Ok(()),
+        Some(tokens) => tokens,
+    };
+
+    let ast = match parse(&ctx, tokens)? {
+        None => return Ok(()),
+        Some(tokens) => tokens,
+    };
+
+    println!("{}", ast.with_ctx(&ctx));
+    Ok(())
+}
+
+fn typecheck_and_stop(input_file: &Path) -> Result<(), Error> {
+    let mut ctx = Context::with_main_file(input_file)?;
+
+    let tokens = match lex(&mut ctx)? {
+        None => return Ok(()),
+        Some(tokens) => tokens,
+    };
+
+    let ast = match parse(&ctx, tokens)? {
+        None => return Ok(()),
+        Some(tokens) => tokens,
+    };
+
+    match analyze(&ast) {
+        Ok(ast) => {
+            println!("{:#?}", ast);
+            println!("{:#?}", ctx);
+        }
+        Err(e) => {
+            let mut out = StandardStream::stderr(ColorChoice::Always);
+            out.set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))?;
+            writeln!(out, "Typer Errors:\n")?;
+            out.reset()?;
+            ctx.emit_diagnostic(&mut out, &e.diagnostic(&ctx))?;
         }
     };
-    println!("{}", ast.with_ctx(&ctx));
     Ok(())
 }
 
@@ -144,14 +176,7 @@ fn main() {
     let res = match args {
         Lex { input_file, debug } => lex_and_stop(&input_file, debug),
         Parse { input_file } => parse_and_stop(&input_file),
-        Simplify { .. } => {
-            eprintln!("Simplification is not yet implemented.");
-            Ok(())
-        }
-        TypeCheck { .. } => {
-            eprintln!("Type Checking is not yet implemented.");
-            Ok(())
-        }
+        TypeCheck { input_file } => typecheck_and_stop(&input_file),
         Compile { .. } => {
             eprintln!("Compilation is not yet implemented.");
             Ok(())
