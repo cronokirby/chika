@@ -1,6 +1,12 @@
-use crate::parser;
 use crate::{context::StringID, types::BuiltinType};
-use parser::{BinOp, ExprKind, ExprStatement, ReturnStatement, StatementKind, UnaryExpr, UnaryOp};
+use crate::{
+    context::{Context, Diagnostic, IsDiagnostic, Location},
+    parser,
+};
+use codespan_reporting::diagnostic::Label;
+use parser::{
+    BinOp, ExprKind, ExprStatement, HasLocation, ReturnStatement, StatementKind, UnaryExpr, UnaryOp,
+};
 use std::collections::HashMap;
 use std::ops::Index;
 
@@ -199,14 +205,46 @@ impl Scopes {
 }
 
 /// Represents an error that can occurr when analyzing the parsed AST
-pub enum AnalysisError {
+pub enum ErrorType {
     FunctionRedefinition(StringID),
     UndefinedVar(StringID),
     UndefinedFunction(StringID),
 }
 
+impl ErrorType {
+    fn at(self, location: Location) -> Error {
+        Error {
+            location,
+            error: self,
+        }
+    }
+}
+
+struct Error {
+    location: Location,
+    error: ErrorType,
+}
+
+impl IsDiagnostic for Error {
+    fn diagnostic(&self, ctx: &Context) -> Diagnostic {
+        use ErrorType::*;
+
+        let msg = match self.error {
+            FunctionRedefinition(name) => Diagnostic::error().with_message(format!(
+                "Redefinition of function `{}`",
+                ctx.get_string(name)
+            )),
+            UndefinedVar(name) => Diagnostic::error()
+                .with_message(format!("Undefined variable `{}`", ctx.get_string(name))),
+            UndefinedFunction(name) => Diagnostic::error()
+                .with_message(format!("Undefined function `{}`", ctx.get_string(name))),
+        };
+        msg.with_labels(vec![Label::primary(self.location.file, self.location)])
+    }
+}
+
 /// A result type containing an error from analysis
-pub type AnalysisResult<T> = Result<T, AnalysisError>;
+pub type AnalysisResult<T> = Result<T, Error>;
 
 struct Analyzer {
     function_ids: HashMap<StringID, FunctionID>,
@@ -236,7 +274,7 @@ impl Analyzer {
         let &id = self
             .function_ids
             .get(&name)
-            .ok_or(AnalysisError::UndefinedFunction(name))?;
+            .ok_or(ErrorType::UndefinedFunction(name).at(expr.location().clone()))?;
         let mut params = Vec::new();
         for i in 0..expr.param_count() {
             params.push(self.expr(expr.param(i))?);
@@ -258,7 +296,7 @@ impl Analyzer {
         let id = self
             .scopes
             .get(name)
-            .ok_or(AnalysisError::UndefinedVar(name))?;
+            .ok_or(ErrorType::UndefinedVar(name).at(expr.location().clone()))?;
         Ok(Expr::VarExpr(id))
     }
 
@@ -327,7 +365,7 @@ impl Analyzer {
     fn function(&mut self, function: parser::Function) -> AnalysisResult<FunctionDef> {
         let name = function.name();
         if self.function_ids.contains_key(&name) {
-            return Err(AnalysisError::FunctionRedefinition(name));
+            return Err(ErrorType::FunctionRedefinition(name).at(function.location().clone()));
         }
         self.scopes.enter();
         let mut arg_types = Vec::new();
