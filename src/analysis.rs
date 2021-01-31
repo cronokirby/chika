@@ -337,6 +337,33 @@ impl Scopes {
     }
 }
 
+/// Represents a kind of constraint we generate when checking types
+enum ConstraintType {
+    /// A function must have a certain return type
+    ReturnType(FunctionID, BuiltinType),
+    /// A function must be able to never return a value
+    NoReturn(FunctionID),
+    /// We've detected that two types must match up
+    SameType(BuiltinType, BuiltinType),
+}
+
+impl ConstraintType {
+    fn at(self, location: Location) -> Constraint {
+        Constraint {
+            location,
+            constraint: self,
+        }
+    }
+}
+
+/// A constraint annotated with a location.
+///
+/// The location is to be able to present better error messages.
+struct Constraint {
+    location: Location,
+    constraint: ConstraintType,
+}
+
 /// Represents an error that can occurr when analyzing the parsed AST
 enum ErrorType {
     FunctionRedefinition(StringID),
