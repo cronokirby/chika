@@ -407,6 +407,35 @@ impl IsDiagnostic for Error {
 /// A result type containing an error from analysis
 pub type AnalysisResult<T> = Result<T, Error>;
 
+fn function_doesnt_return(function: parser::Function) -> Option<Location> {
+    fn block_statement_returns(block: parser::BlockStatement) -> bool {
+        for i in 0..block.len() {
+            if returns(block.statement(i)) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// True if control flow always exits after running this statement
+    fn returns(statement: parser::Statement) -> bool {
+        match statement.kind() {
+            StatementKind::ReturnStatement(_) => true,
+            StatementKind::IfStatement(statement) => {
+                returns(statement.if_branch()) && statement.else_branch().map_or(false, returns)
+            }
+            StatementKind::BlockStatement(statement) => block_statement_returns(statement),
+            _ => false,
+        }
+    }
+
+    let body = function.body();
+    if block_statement_returns(body.clone()) {
+        return None;
+    }
+    Some(body.location().clone())
+}
+
 struct Analyzer {
     function_ids: HashMap<StringID, FunctionID>,
     function_table: FunctionTable,
@@ -605,6 +634,12 @@ impl Analyzer {
         self.function_ids.insert(name, id);
         let body = self.block_statement(function.body())?;
         self.scopes.exit();
+
+        if let Some(location) = function_doesnt_return(function.clone()) {
+            self.constraints
+                .push(ConstraintType::NoReturn(id).at(location));
+        }
+
         Ok(FunctionDef { id, args, body })
     }
 

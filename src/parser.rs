@@ -17,7 +17,7 @@ use TokenType::*;
 /// This is used to differentiatate different kinds of raw nodes.
 ///
 /// When creating a raw node, we always attach the correct tag.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 #[repr(u8)]
 enum Tag {
     IntLitExpr,
@@ -55,7 +55,7 @@ enum Tag {
 ///
 /// We need this, because everything we have is stored in this unified
 /// node type, and we need to handle terminal things like strings and literals.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum NodeShape {
     /// This node is a terminal reference to a string
     String(StringID),
@@ -72,7 +72,7 @@ enum NodeShape {
 /// Our overall AST structure is based on representing things
 /// with our plain untyped representation, and then using a typed outer layer
 /// for actually manipulating things.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Node {
     /// The location of this node in the original file
     location: Location,
@@ -147,7 +147,7 @@ macro_rules! impl_variant {
 }
 
 /// Represents a strongly typed enumeration of expressions.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ExprKind {
     /// An single int as an expression
     IntLitExpr(IntLitExpr),
@@ -174,7 +174,7 @@ impl DisplayWithContext for ExprKind {
 }
 
 /// Represents a generic kind of expression
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Expr(Rc<Node>);
 
 impl Expr {
@@ -278,7 +278,7 @@ impl DisplayWithContext for Expr {
 impl_has_location!(Expr);
 
 /// A function call, used as an expressi0on
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct FunctionExpr(Rc<Node>);
 
 impl FunctionExpr {
@@ -312,7 +312,7 @@ impl_variant!(ExprKind, FunctionExpr);
 impl_has_location!(FunctionExpr);
 
 /// An integer literal, used as an expression
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct IntLitExpr(Rc<Node>);
 
 impl IntLitExpr {
@@ -332,7 +332,7 @@ impl_variant!(ExprKind, IntLitExpr);
 impl_has_location!(IntLitExpr);
 
 /// A reference to a variable, used as an expression
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct VarExpr(Rc<Node>);
 
 impl VarExpr {
@@ -406,7 +406,7 @@ impl fmt::Display for BinOp {
 }
 
 /// An expression applying a binary operator to two expressions
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BinExpr {
     /// The operator being used
     pub op: BinOp,
@@ -441,7 +441,7 @@ impl_variant!(ExprKind, BinExpr);
 impl_has_location!(BinExpr, node);
 
 /// A unary operator of some kind
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum UnaryOp {
     /// Negation of an integer
     Negate,
@@ -458,7 +458,7 @@ impl fmt::Display for UnaryOp {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct UnaryExpr {
     /// The operator being used
     pub op: UnaryOp,
@@ -481,6 +481,7 @@ impl_variant!(ExprKind, UnaryExpr);
 impl_has_location!(UnaryExpr, node);
 
 /// Represents a strongly typed kind of statement
+#[derive(Clone, Debug)]
 pub enum StatementKind {
     /// A return statement
     ReturnStatement(ReturnStatement),
@@ -506,6 +507,7 @@ impl DisplayWithContext for StatementKind {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Statement(Rc<Node>);
 
 impl Statement {
@@ -531,6 +533,7 @@ impl DisplayWithContext for Statement {
 impl_has_location!(Statement);
 
 /// A statement returning the value of some expression
+#[derive(Clone, Debug)]
 pub struct ReturnStatement(Rc<Node>);
 
 impl ReturnStatement {
@@ -550,6 +553,7 @@ impl_variant!(StatementKind, ReturnStatement);
 impl_has_location!(ReturnStatement);
 
 /// A statement defining a new variable
+#[derive(Clone, Debug)]
 pub struct VarStatement(Rc<Node>);
 
 impl VarStatement {
@@ -585,6 +589,7 @@ impl_variant!(StatementKind, VarStatement);
 impl_has_location!(VarStatement);
 
 /// A block statement is composed of multiple statements together
+#[derive(Clone, Debug)]
 pub struct BlockStatement(Rc<Node>);
 
 impl BlockStatement {
@@ -618,6 +623,7 @@ impl_has_location!(BlockStatement);
 /// Represents a conditional statement.
 ///
 /// We might have an optional else branch as well.
+#[derive(Clone, Debug)]
 pub struct IfStatement {
     has_else: bool,
     node: Rc<Node>,
@@ -676,6 +682,7 @@ impl_has_location!(IfStatement, node);
 ///
 /// This might seem useless, but keep in mind that this may include function
 /// calls, and those side effects may be important.
+#[derive(Clone, Debug)]
 pub struct ExprStatement(Rc<Node>);
 
 impl ExprStatement {
@@ -695,6 +702,7 @@ impl_variant!(StatementKind, ExprStatement);
 impl_has_location!(ExprStatement);
 
 /// A definition of a new function
+#[derive(Clone, Debug)]
 pub struct Function(Rc<Node>);
 
 impl Function {
@@ -741,7 +749,7 @@ impl DisplayWithContext for Function {
 
 impl_has_location!(Function);
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AST(Rc<Node>);
 
 impl AST {
