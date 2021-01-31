@@ -233,12 +233,14 @@ impl DisplayWithContext for Statement {
             },
             Statement::Block(statements) => {
                 write!(f, "{{\n")?;
-                let ctx = ctx.indented();
+                let new_ctx = ctx.indented();
                 for s in statements {
-                    ctx.blank_space(f)?;
-                    write!(f, "{};\n", s.with_ctx(ctx))?;
+                    new_ctx.blank_space(f)?;
+                    write!(f, "{};\n", s.with_ctx(new_ctx))?;
                 }
-                write!(f, "}}\n")
+                ctx.blank_space(f)?;
+                write!(f, "}}\n")?;
+                ctx.blank_space(f)
             }
         }
     }
@@ -370,6 +372,9 @@ enum ErrorType {
     FunctionRedefinition(StringID),
     UndefinedVar(StringID),
     UndefinedFunction(StringID),
+    TypeMismatch(BuiltinType, BuiltinType),
+    NoReturnInFunction(StringID, BuiltinType),
+    BadReturnType(StringID, BuiltinType, BuiltinType),
 }
 
 impl ErrorType {
@@ -390,22 +395,55 @@ impl IsDiagnostic for Error {
     fn diagnostic(&self, ctx: &Context) -> Diagnostic {
         use ErrorType::*;
 
-        let msg = match self.error {
-            FunctionRedefinition(name) => Diagnostic::error().with_message(format!(
-                "Redefinition of function `{}`",
-                ctx.get_string(name)
-            )),
+        match self.error {
+            FunctionRedefinition(name) => Diagnostic::error()
+                .with_message(format!(
+                    "Redefinition of function `{}`",
+                    ctx.get_string(name)
+                ))
+                .with_labels(vec![Label::primary(self.location.file, self.location)]),
             UndefinedVar(name) => Diagnostic::error()
-                .with_message(format!("Undefined variable `{}`", ctx.get_string(name))),
+                .with_message(format!("Undefined variable `{}`", ctx.get_string(name)))
+                .with_labels(vec![Label::primary(self.location.file, self.location)]),
             UndefinedFunction(name) => Diagnostic::error()
-                .with_message(format!("Undefined function `{}`", ctx.get_string(name))),
-        };
-        msg.with_labels(vec![Label::primary(self.location.file, self.location)])
+                .with_message(format!("Undefined function `{}`", ctx.get_string(name)))
+                .with_labels(vec![Label::primary(self.location.file, self.location)]),
+            TypeMismatch(expected, actual) => Diagnostic::error()
+                .with_message("Type mismatch")
+                .with_labels(vec![Label::primary(self.location.file, self.location)
+                    .with_message(format!(
+                        "this has type `{}` instead of `{}`",
+                        actual, expected
+                    ))])
+                .with_notes(vec![format!(
+                    "found `{}` instead of `{}`",
+                    actual, expected
+                )]),
+            NoReturnInFunction(name, typ) => Diagnostic::error()
+                .with_message("Control reached end of function")
+                .with_labels(vec![Label::primary(self.location.file, self.location)
+                    .with_message("control ends here")])
+                .with_notes(vec![
+                    format!("Inside of function `{}`", ctx.get_string(name)),
+                    format!("This function returns type `{}`, and not `Unit`", typ),
+                ]),
+            BadReturnType(name, expected, actual) => Diagnostic::error()
+                .with_message("Incorrect return value")
+                .with_labels(vec![Label::primary(self.location.file, self.location)
+                    .with_message(format!(
+                        "this has type `{}` instead of `{}`",
+                        actual, expected
+                    ))])
+                .with_notes(vec![
+                    format!("inside function `{}`", ctx.get_string(name)),
+                    format!("this function should return type `{}`", expected),
+                ]),
+        }
     }
 }
 
 /// A result type containing an error from analysis
-pub type AnalysisResult<T> = Result<T, Error>;
+type AnalysisResult<T> = Result<T, Error>;
 
 fn function_doesnt_return(function: parser::Function) -> Option<Location> {
     fn block_statement_returns(block: parser::BlockStatement) -> bool {
@@ -433,7 +471,12 @@ fn function_doesnt_return(function: parser::Function) -> Option<Location> {
     if block_statement_returns(body.clone()) {
         return None;
     }
-    Some(body.location().clone())
+    if body.len() == 0 {
+        Some(body.location().clone())
+    } else {
+        let last = body.statement(body.len() - 1);
+        Some(last.location().clone())
+    }
 }
 
 struct Analyzer {
@@ -482,7 +525,11 @@ impl Analyzer {
                     .push(ConstraintType::SameType(I32, r_typ).at(expr.rhs().location().clone()));
                 Bool
             }
-            BinOp::Equal | BinOp::NotEqual => Bool,
+            BinOp::Equal | BinOp::NotEqual => {
+                self.constraints
+                    .push(ConstraintType::SameType(l_typ, r_typ).at(expr.rhs().location().clone()));
+                Bool
+            }
         };
         Ok((Expr::BinExpr(expr.op, Box::new(lhs), Box::new(rhs)), typ))
     }
@@ -632,6 +679,7 @@ impl Analyzer {
             .function_table
             .add_function(Function::new(name, ret_type, arg_types));
         self.function_ids.insert(name, id);
+        self.current_function = Some(id);
         let body = self.block_statement(function.body())?;
         self.scopes.exit();
 
@@ -643,20 +691,63 @@ impl Analyzer {
         Ok(FunctionDef { id, args, body })
     }
 
-    fn run(mut self, ast: &parser::AST) -> AnalysisResult<AST> {
+    fn run(&mut self, ast: &parser::AST) -> AnalysisResult<Vec<FunctionDef>> {
         let mut functions = Vec::new();
         for i in 0..ast.function_count() {
             let function = ast.function(i);
             functions.push(self.function(function)?);
         }
-        Ok(AST {
-            functions,
-            function_table: self.function_table,
-            variable_table: self.variable_table,
-        })
+        Ok(functions)
     }
 }
 
-pub fn analyze(ast: &parser::AST) -> AnalysisResult<AST> {
-    Analyzer::new().run(ast)
+fn solve_constraints(functions: &FunctionTable, constraints: Vec<Constraint>) -> Vec<Error> {
+    let mut errors = Vec::new();
+    for constraint in constraints {
+        match constraint.constraint {
+            ConstraintType::SameType(expected, actual) => {
+                if expected != actual {
+                    errors.push(ErrorType::TypeMismatch(expected, actual).at(constraint.location))
+                }
+            }
+            ConstraintType::NoReturn(id) => {
+                let function = &functions[id];
+                let ret_type = function.return_type;
+                if ret_type != Unit {
+                    errors.push(
+                        ErrorType::NoReturnInFunction(function.name, ret_type)
+                            .at(constraint.location),
+                    );
+                }
+            }
+            ConstraintType::ReturnType(id, actual) => {
+                let function = &functions[id];
+                let ret_type = function.return_type;
+                if ret_type != actual {
+                    errors.push(
+                        ErrorType::BadReturnType(function.name, ret_type, actual)
+                            .at(constraint.location),
+                    )
+                }
+            }
+        }
+    }
+    errors
+}
+
+pub fn analyze(ast: &parser::AST) -> Result<AST, Vec<Error>> {
+    let mut analyzer = Analyzer::new();
+    let functions = match analyzer.run(ast) {
+        Err(e) => return Err(vec![e]),
+        Ok(ast) => ast,
+    };
+    let errors = solve_constraints(&analyzer.function_table, analyzer.constraints);
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+    Ok(AST {
+        functions,
+        function_table: analyzer.function_table,
+        variable_table: analyzer.variable_table,
+    })
 }
