@@ -11,6 +11,7 @@ use core::fmt;
 use parser::{BinOp, ExprKind, HasLocation, StatementKind, UnaryOp};
 use std::collections::HashMap;
 use std::ops::Index;
+use BuiltinType::*;
 
 /// Represents the information we have about some function
 #[derive(Clone, Debug)]
@@ -411,6 +412,8 @@ struct Analyzer {
     function_table: FunctionTable,
     variable_table: VariableTable,
     scopes: Scopes,
+    constraints: Vec<Constraint>,
+    current_function: Option<FunctionID>,
 }
 
 impl Analyzer {
@@ -420,47 +423,93 @@ impl Analyzer {
             function_table: FunctionTable::new(),
             variable_table: VariableTable::new(),
             scopes: Scopes::new(),
+            constraints: Vec::new(),
+            current_function: None,
         }
     }
 
-    fn bin_expr(&mut self, expr: parser::BinExpr) -> AnalysisResult<Expr> {
-        let lhs = self.expr(expr.lhs())?;
-        let rhs = self.expr(expr.rhs())?;
-        Ok(Expr::BinExpr(expr.op, Box::new(lhs), Box::new(rhs)))
+    fn bin_expr(&mut self, expr: parser::BinExpr) -> AnalysisResult<(Expr, BuiltinType)> {
+        let (lhs, l_typ) = self.expr(expr.lhs())?;
+        let (rhs, r_typ) = self.expr(expr.rhs())?;
+        let typ = match expr.op {
+            BinOp::Add | BinOp::Div | BinOp::Mul | BinOp::Sub | BinOp::BitOr | BinOp::BitAnd => {
+                self.constraints
+                    .push(ConstraintType::SameType(I32, l_typ).at(expr.lhs().location().clone()));
+                self.constraints
+                    .push(ConstraintType::SameType(I32, r_typ).at(expr.rhs().location().clone()));
+                I32
+            }
+            BinOp::And | BinOp::Or => {
+                self.constraints
+                    .push(ConstraintType::SameType(Bool, l_typ).at(expr.lhs().location().clone()));
+                self.constraints
+                    .push(ConstraintType::SameType(Bool, r_typ).at(expr.rhs().location().clone()));
+                Bool
+            }
+            BinOp::Less | BinOp::LessEqual | BinOp::Greater | BinOp::GreaterEqual => {
+                self.constraints
+                    .push(ConstraintType::SameType(I32, l_typ).at(expr.lhs().location().clone()));
+                self.constraints
+                    .push(ConstraintType::SameType(I32, r_typ).at(expr.rhs().location().clone()));
+                Bool
+            }
+            BinOp::Equal | BinOp::NotEqual => Bool,
+        };
+        Ok((Expr::BinExpr(expr.op, Box::new(lhs), Box::new(rhs)), typ))
     }
 
-    fn function_expr(&mut self, expr: parser::FunctionExpr) -> AnalysisResult<Expr> {
+    fn function_expr(&mut self, expr: parser::FunctionExpr) -> AnalysisResult<(Expr, BuiltinType)> {
         let name = expr.function();
         let &id = self
             .function_ids
             .get(&name)
             .ok_or(ErrorType::UndefinedFunction(name).at(expr.location().clone()))?;
+        let function = self.function_table[id].clone();
         let mut params = Vec::new();
         for i in 0..expr.param_count() {
-            params.push(self.expr(expr.param(i))?);
+            let (param, typ) = self.expr(expr.param(i))?;
+            self.constraints.push(
+                ConstraintType::SameType(function.arg_types[i], typ)
+                    .at(expr.param(i).location().clone()),
+            );
+            params.push(param);
         }
-        Ok(Expr::FunctionCall(id, params))
+        let typ = function.return_type;
+        Ok((Expr::FunctionCall(id, params), typ))
     }
 
-    fn int_lit_expr(&mut self, expr: parser::IntLitExpr) -> AnalysisResult<Expr> {
-        Ok(Expr::IntExpr(expr.int_lit()))
+    fn int_lit_expr(&mut self, expr: parser::IntLitExpr) -> AnalysisResult<(Expr, BuiltinType)> {
+        Ok((Expr::IntExpr(expr.int_lit()), I32))
     }
 
-    fn unary_expr(&mut self, expr: parser::UnaryExpr) -> AnalysisResult<Expr> {
-        let operand = self.expr(expr.expr())?;
-        Ok(Expr::UnaryExpr(expr.op, Box::new(operand)))
+    fn unary_expr(&mut self, expr: parser::UnaryExpr) -> AnalysisResult<(Expr, BuiltinType)> {
+        let (operand, operand_typ) = self.expr(expr.expr())?;
+        let typ = match expr.op {
+            UnaryOp::Negate => {
+                self.constraints
+                    .push(ConstraintType::SameType(I32, operand_typ).at(expr.location().clone()));
+                I32
+            }
+            UnaryOp::Not => {
+                self.constraints
+                    .push(ConstraintType::SameType(Bool, operand_typ).at(expr.location().clone()));
+                Bool
+            }
+        };
+        Ok((Expr::UnaryExpr(expr.op, Box::new(operand)), typ))
     }
 
-    fn var_expr(&mut self, expr: parser::VarExpr) -> AnalysisResult<Expr> {
+    fn var_expr(&mut self, expr: parser::VarExpr) -> AnalysisResult<(Expr, BuiltinType)> {
         let name = expr.var();
         let id = self
             .scopes
             .get(name)
             .ok_or(ErrorType::UndefinedVar(name).at(expr.location().clone()))?;
-        Ok(Expr::VarExpr(id))
+        let var_typ = self.variable_table[id].typ;
+        Ok((Expr::VarExpr(id), var_typ))
     }
 
-    fn expr(&mut self, expr: parser::Expr) -> AnalysisResult<Expr> {
+    fn expr(&mut self, expr: parser::Expr) -> AnalysisResult<(Expr, BuiltinType)> {
         match expr.kind() {
             ExprKind::BinExpr(expr) => self.bin_expr(expr),
             ExprKind::FunctionExpr(expr) => self.function_expr(expr),
@@ -482,12 +531,14 @@ impl Analyzer {
     }
 
     fn expr_statement(&mut self, statement: parser::ExprStatement) -> AnalysisResult<Statement> {
-        let expr = self.expr(statement.expr())?;
+        let (expr, _) = self.expr(statement.expr())?;
         Ok(Statement::Expr(expr))
     }
 
     fn if_statement(&mut self, statement: parser::IfStatement) -> AnalysisResult<Statement> {
-        let cond = self.expr(statement.cond())?;
+        let (cond, typ) = self.expr(statement.cond())?;
+        self.constraints
+            .push(ConstraintType::SameType(Bool, typ).at(statement.cond().location().clone()));
         let if_branch = self.statement(statement.if_branch())?;
         let else_branch = match statement.else_branch() {
             None => None,
@@ -501,7 +552,9 @@ impl Analyzer {
         let typ = statement.typ();
         let id = self.variable_table.add_variable(Variable::new(var, typ));
         self.scopes.put(var, id);
-        let expr = self.expr(statement.expr())?;
+        let (expr, expr_typ) = self.expr(statement.expr())?;
+        self.constraints
+            .push(ConstraintType::SameType(typ, expr_typ).at(statement.expr().location().clone()));
         Ok(Statement::Var(id, expr))
     }
 
@@ -509,7 +562,11 @@ impl Analyzer {
         &mut self,
         statement: parser::ReturnStatement,
     ) -> AnalysisResult<Statement> {
-        let expr = self.expr(statement.expr())?;
+        let (expr, typ) = self.expr(statement.expr())?;
+        let function = self.current_function.unwrap();
+        self.constraints.push(
+            ConstraintType::ReturnType(function, typ).at(statement.expr().location().clone()),
+        );
         Ok(Statement::Return(expr))
     }
 
