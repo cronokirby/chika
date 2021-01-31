@@ -657,13 +657,8 @@ impl Analyzer {
     }
 
     fn function(&mut self, function: parser::Function) -> AnalysisResult<FunctionDef> {
-        let name = function.name();
-        if self.function_ids.contains_key(&name) {
-            return Err(ErrorType::FunctionRedefinition(name).at(function.location().clone()));
-        }
         self.scopes.enter();
         let mut args = Vec::new();
-        let mut arg_types = Vec::new();
         // This scheme allows parameters to shadow preceding ones.
         // The rationale is that this is similar to var statements inside a function
         for i in 0..function.param_count() {
@@ -672,13 +667,8 @@ impl Analyzer {
             let var_id = self.variable_table.add_variable(var);
             self.scopes.put(name, var_id);
             args.push(var_id);
-            arg_types.push(typ);
         }
-        let ret_type = function.return_type();
-        let id = self
-            .function_table
-            .add_function(Function::new(name, ret_type, arg_types));
-        self.function_ids.insert(name, id);
+        let id = self.function_ids[&function.name()];
         self.current_function = Some(id);
         let body = self.block_statement(function.body())?;
         self.scopes.exit();
@@ -691,11 +681,31 @@ impl Analyzer {
         Ok(FunctionDef { id, args, body })
     }
 
+    fn gather_function(&mut self, function: parser::Function) -> AnalysisResult<()> {
+        let name = function.name();
+        if self.function_ids.contains_key(&name) {
+            return Err(ErrorType::FunctionRedefinition(name).at(function.location().clone()));
+        }
+        let mut arg_types = Vec::new();
+        for i in 0..function.param_count() {
+            let (_, typ) = function.param(i);
+            arg_types.push(typ);
+        }
+        let ret_type = function.return_type();
+        let id = self
+            .function_table
+            .add_function(Function::new(name, ret_type, arg_types));
+        self.function_ids.insert(name, id);
+        Ok(())
+    }
+
     fn run(&mut self, ast: &parser::AST) -> AnalysisResult<Vec<FunctionDef>> {
         let mut functions = Vec::new();
         for i in 0..ast.function_count() {
-            let function = ast.function(i);
-            functions.push(self.function(function)?);
+            self.gather_function(ast.function(i))?;
+        }
+        for i in 0..ast.function_count() {
+            functions.push(self.function(ast.function(i))?);
         }
         Ok(functions)
     }
