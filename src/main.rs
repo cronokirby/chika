@@ -157,12 +157,14 @@ fn typecheck_and_stop(input_file: &Path) -> Result<(), Error> {
         Ok(ast) => {
             print!("{}", (&ast).with_ctx(&ctx));
         }
-        Err(e) => {
+        Err(errors) => {
             let mut out = StandardStream::stderr(ColorChoice::Always);
             out.set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))?;
             writeln!(out, "Typer Errors:\n")?;
             out.reset()?;
-            ctx.emit_diagnostic(&mut out, &e.diagnostic(&ctx))?;
+            for e in errors {
+                ctx.emit_diagnostic(&mut out, &e.diagnostic(&ctx))?;
+            }
         }
     };
     Ok(())
