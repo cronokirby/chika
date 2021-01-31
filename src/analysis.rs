@@ -375,6 +375,7 @@ enum ErrorType {
     TypeMismatch(BuiltinType, BuiltinType),
     NoReturnInFunction(StringID, BuiltinType),
     BadReturnType(StringID, BuiltinType, BuiltinType),
+    IncorrectArgumentCount(StringID, usize, usize),
 }
 
 impl ErrorType {
@@ -425,7 +426,7 @@ impl IsDiagnostic for Error {
                     .with_message("control ends here")])
                 .with_notes(vec![
                     format!("Inside of function `{}`", ctx.get_string(name)),
-                    format!("This function returns type `{}`, and not `Unit`", typ),
+                    format!("This functior returns type `{}`, and not `Unit`", typ),
                 ]),
             BadReturnType(name, expected, actual) => Diagnostic::error()
                 .with_message("Incorrect return value")
@@ -438,6 +439,18 @@ impl IsDiagnostic for Error {
                     format!("inside function `{}`", ctx.get_string(name)),
                     format!("this function should return type `{}`", expected),
                 ]),
+            IncorrectArgumentCount(name, expected, actual) => Diagnostic::error()
+                .with_message("Incorrect argument count")
+                .with_labels(vec![Label::primary(self.location.file, self.location)
+                    .with_message(format!(
+                        "{} arguments instead of {}",
+                        actual, expected
+                    ))])
+                .with_notes(vec![format!(
+                    "function `{}` takes {} arguments",
+                    ctx.get_string(name),
+                    expected
+                )]),
         }
     }
 }
@@ -542,6 +555,15 @@ impl Analyzer {
             .ok_or(ErrorType::UndefinedFunction(name).at(expr.location().clone()))?;
         let function = self.function_table[id].clone();
         let mut params = Vec::new();
+        let expected_len = function.arg_types.len();
+        if expected_len != expr.param_count() {
+            return Err(ErrorType::IncorrectArgumentCount(
+                function.name,
+                expected_len,
+                expr.param_count(),
+            )
+            .at(expr.location().clone()));
+        }
         for i in 0..expr.param_count() {
             let (param, typ) = self.expr(expr.param(i))?;
             self.constraints.push(
