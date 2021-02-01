@@ -213,6 +213,8 @@ pub enum Statement {
     If(Expr, Box<Statement>, Option<Box<Statement>>),
     /// Define a new variable, with a given expression as its value
     Var(VariableID, Expr),
+    /// Assign a value to a variable that exists
+    Assign(VariableID, Expr),
 }
 
 impl DisplayWithContext for Statement {
@@ -222,6 +224,7 @@ impl DisplayWithContext for Statement {
             Statement::Return(None) => write!(f, "return"),
             Statement::Return(Some(e)) => write!(f, "return {}", e),
             Statement::Var(v, e) => write!(f, "var {} = {}", v, e),
+            Statement::Assign(v, e) => write!(f, "{} = {}", v, e),
             Statement::If(cond, if_branch, else_branch) => match else_branch {
                 None => write!(f, "(if {} {})", cond, if_branch.with_ctx(ctx)),
                 Some(branch) => write!(
@@ -679,6 +682,10 @@ impl Analyzer {
         }
     }
 
+    fn assign_statement(&mut self, statement: parser::AssignStatement) -> AnalysisResult<Statement> {
+        unimplemented!()
+    }
+
     fn statement(&mut self, statement: parser::Statement) -> AnalysisResult<Statement> {
         match statement.kind() {
             StatementKind::BlockStatement(block) => self.block_statement(block),
@@ -686,6 +693,7 @@ impl Analyzer {
             StatementKind::IfStatement(statement) => self.if_statement(statement),
             StatementKind::VarStatement(statement) => self.var_statement(statement),
             StatementKind::ReturnStatement(statement) => self.return_statement(statement),
+            StatementKind::AssignStatement(statement) => self.assign_statement(statement),
         }
     }
 
