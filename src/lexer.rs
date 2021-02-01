@@ -27,12 +27,20 @@ pub enum TokenType {
     Comma,
     /// + symbol
     Plus,
+    /// += symbol
+    PlusEqual,
     /// - symbol
     Minus,
+    /// -= symbol
+    MinusEqual,
     /// / symbol
     Div,
+    /// /= symbol
+    DivEqual,
     /// * symbol
     Times,
+    /// *= symbol
+    TimesEqual,
     /// = symbol
     Equals,
     /// == symbol
@@ -51,10 +59,14 @@ pub enum TokenType {
     GreaterEqual,
     /// | symbol
     Or,
+    /// |= symbol
+    OrEqual,
     /// || symbol
     OrOr,
     /// & symbol
     And,
+    /// &= symbol
+    AndEqual,
     /// && symbol
     AndAnd,
     /// `fn` keyword
@@ -88,9 +100,13 @@ impl DisplayWithContext for TokenType {
             Colon => write!(f, ":"),
             Comma => write!(f, ","),
             Plus => write!(f, "+"),
+            PlusEqual => write!(f, "+="),
             Minus => write!(f, "-"),
+            MinusEqual => write!(f, "-="),
             Div => write!(f, "/"),
+            DivEqual => write!(f, "/="),
             Times => write!(f, "*"),
+            TimesEqual => write!(f, "*="),
             Equals => write!(f, "="),
             EqualsEquals => write!(f, "=="),
             Bang => write!(f, "!"),
@@ -100,8 +116,10 @@ impl DisplayWithContext for TokenType {
             Greater => write!(f, ">"),
             GreaterEqual => write!(f, ">="),
             Or => write!(f, "|"),
+            OrEqual => write!(f, "|="),
             OrOr => write!(f, "||"),
             And => write!(f, "&"),
+            AndEqual => write!(f, "&="),
             AndAnd => write!(f, "&&"),
             Fn => write!(f, "fn"),
             Return => write!(f, "return"),
@@ -268,10 +286,34 @@ impl<'a> Iterator for Lexer<'a> {
             ')' => CloseParens,
             ';' => Semicolon,
             ':' => Colon,
-            '+' => Plus,
-            '-' => Minus,
-            '/' => Div,
-            '*' => Times,
+            '+' => match self.chars.peek() {
+                Some('=') => {
+                    self.next();
+                    PlusEqual
+                }
+                _ => Plus,
+            },
+            '-' => match self.chars.peek() {
+                Some('=') => {
+                    self.next();
+                    MinusEqual
+                }
+                _ => Minus,
+            },
+            '/' => match self.chars.peek() {
+                Some('=') => {
+                    self.next();
+                    DivEqual
+                }
+                _ => Div,
+            },
+            '*' => match self.chars.peek() {
+                Some('=') => {
+                    self.next();
+                    TimesEqual
+                }
+                _ => Times,
+            },
             ',' => Comma,
             '<' => match self.chars.peek() {
                 Some('=') => {
@@ -299,12 +341,20 @@ impl<'a> Iterator for Lexer<'a> {
                     self.next();
                     OrOr
                 }
+                Some('=') => {
+                    self.next();
+                    OrEqual
+                }
                 _ => Or,
             },
             '&' => match self.chars.peek() {
                 Some('&') => {
                     self.next();
                     AndAnd
+                }
+                Some('=') => {
+                    self.next();
+                    AndEqual
                 }
                 _ => And,
             },
@@ -416,5 +466,10 @@ mod test {
     #[test]
     fn boolean_operators_lex() {
         should_lex("== != > >= < <= || && | & !");
+    }
+
+    #[test]
+    fn assignment_operators_lex() {
+        should_lex("== += *= /= -= &= |=");
     }
 }
