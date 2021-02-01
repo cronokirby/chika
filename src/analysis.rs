@@ -208,7 +208,7 @@ pub enum Statement {
     /// An expression, using as a statement
     Expr(Expr),
     /// Return the value of an expression
-    Return(Expr),
+    Return(Option<Expr>),
     /// An if statement, with a possible else branch
     If(Expr, Box<Statement>, Option<Box<Statement>>),
     /// Define a new variable, with a given expression as its value
@@ -219,7 +219,8 @@ impl DisplayWithContext for Statement {
     fn fmt_with<'a>(&self, ctx: DisplayContext<'a>, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Statement::Expr(e) => write!(f, "{}", e),
-            Statement::Return(e) => write!(f, "return {}", e),
+            Statement::Return(None) => write!(f, "return"),
+            Statement::Return(Some(e)) => write!(f, "return {}", e),
             Statement::Var(v, e) => write!(f, "var {} = {}", v, e),
             Statement::If(cond, if_branch, else_branch) => match else_branch {
                 None => write!(f, "(if {} {})", cond, if_branch.with_ctx(ctx)),
@@ -660,12 +661,22 @@ impl Analyzer {
         &mut self,
         statement: parser::ReturnStatement,
     ) -> AnalysisResult<Statement> {
-        let (expr, typ) = self.expr(statement.expr())?;
         let function = self.current_function.unwrap();
-        self.constraints.push(
-            ConstraintType::ReturnType(function, typ).at(statement.expr().location().clone()),
-        );
-        Ok(Statement::Return(expr))
+        match statement.expr() {
+            None => {
+                self.constraints.push(
+                    ConstraintType::ReturnType(function, Unit).at(statement.location().clone()),
+                );
+                Ok(Statement::Return(None))
+            }
+            Some(statement_expr) => {
+                let (expr, typ) = self.expr(statement_expr.clone())?;
+                self.constraints.push(
+                    ConstraintType::ReturnType(function, typ).at(statement_expr.location().clone()),
+                );
+                Ok(Statement::Return(Some(expr)))
+            }
+        }
     }
 
     fn statement(&mut self, statement: parser::Statement) -> AnalysisResult<Statement> {
