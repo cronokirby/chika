@@ -38,13 +38,13 @@ enum Tag {
     UnaryExprNegate,
     UnaryExprNot,
     VarExpr,
-    Assign,
-    AssignAdd,
-    AssignMul,
-    AssignSub,
-    AssignDiv,
-    AssignBitOr,
-    AssignBitAnd,
+    AssignExpr,
+    AssignExprAdd,
+    AssignExprMul,
+    AssignExprSub,
+    AssignExprDiv,
+    AssignExprBitOr,
+    AssignExprBitAnd,
     FunctionExpr,
     ExprStatement,
     ReturnStatement,
@@ -163,6 +163,8 @@ pub enum ExprKind {
     IntLitExpr(IntLitExpr),
     /// A single variable as an expression
     VarExpr(VarExpr),
+    /// An assignment to a variable, as an expression
+    AssignExpr(AssignExpr),
     /// Binary operators, as an expression
     BinExpr(BinExpr),
     /// Unary operators, as an expression
@@ -176,6 +178,7 @@ impl DisplayWithContext for ExprKind {
         match self {
             ExprKind::IntLitExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
             ExprKind::VarExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
+            ExprKind::AssignExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
             ExprKind::BinExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
             ExprKind::UnaryExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
             ExprKind::FunctionExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
@@ -273,6 +276,41 @@ impl Expr {
                 node: self.0.clone(),
             }
             .into(),
+            Tag::AssignExpr => AssignExpr {
+                op: None,
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::AssignExprAdd => AssignExpr {
+                op: Some(BinOp::Add),
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::AssignExprSub => AssignExpr {
+                op: Some(BinOp::Sub),
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::AssignExprMul => AssignExpr {
+                op: Some(BinOp::Mul),
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::AssignExprDiv => AssignExpr {
+                op: Some(BinOp::Div),
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::AssignExprBitOr => AssignExpr {
+                op: Some(BinOp::BitOr),
+                node: self.0.clone(),
+            }
+            .into(),
+            Tag::AssignExprBitAnd => AssignExpr {
+                op: Some(BinOp::BitAnd),
+                node: self.0.clone(),
+            }
+            .into(),
             Tag::FunctionExpr => FunctionExpr(self.0.clone()).into(),
             other => panic!("unexpected tag {:?}", other),
         }
@@ -360,6 +398,45 @@ impl DisplayWithContext for VarExpr {
 
 impl_variant!(ExprKind, VarExpr);
 impl_has_location!(VarExpr);
+
+/// An assignment to a variable, as an expression
+#[derive(Clone, Debug)]
+pub struct AssignExpr {
+    pub op: Option<BinOp>,
+    node: Rc<Node>,
+}
+
+impl AssignExpr {
+    pub fn var_location(&self) -> Location {
+        self.node.branch()[0].location
+    }
+
+    pub fn var(&self) -> StringID {
+        self.node.branch()[0].string()
+    }
+
+    pub fn expr(&self) -> Expr {
+        Expr(self.node.branch()[1].clone())
+    }
+}
+
+impl DisplayWithContext for AssignExpr {
+    fn fmt_with<'a>(&self, ctx: DisplayContext<'a>, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.op {
+            None => write!(f, "(=")?,
+            Some(op) => write!(f, "({}=", op)?,
+        };
+        write!(
+            f,
+            " {} {})",
+            ctx.ctx.get_string(self.var()),
+            self.expr().with_ctx(ctx)
+        )
+    }
+}
+
+impl_variant!(ExprKind, AssignExpr);
+impl_has_location!(AssignExpr, node);
 
 /// The kind of binary operation we're using
 #[derive(Clone, Copy, Debug)]
@@ -511,8 +588,6 @@ pub enum StatementKind {
     ReturnStatement(ReturnStatement),
     /// The creation of a new variable
     VarStatement(VarStatement),
-    /// Assign a value to some variable
-    AssignStatement(AssignStatement),
     /// A block containing multiple statements
     BlockStatement(BlockStatement),
     /// An if statement, possibly containing an else
@@ -529,7 +604,6 @@ impl DisplayWithContext for StatementKind {
             StatementKind::BlockStatement(s) => s.fmt_with(ctx, f),
             StatementKind::IfStatement(s) => s.fmt_with(ctx, f),
             StatementKind::ExprStatement(s) => s.fmt_with(ctx, f),
-            StatementKind::AssignStatement(s) => s.fmt_with(ctx, f),
         }
     }
 }
@@ -629,42 +703,6 @@ impl DisplayWithContext for VarStatement {
 
 impl_variant!(StatementKind, VarStatement);
 impl_has_location!(VarStatement);
-
-/// A statement assigning some operator modified expression to some variable
-#[derive(Clone, Debug)]
-pub struct AssignStatement {
-    pub op: Option<BinOp>,
-    node: Rc<Node>,
-}
-
-impl AssignStatement {
-    /// The string of the variable being assigned to
-    pub fn var(&self) -> StringID {
-        self.node.branch()[0].string()
-    }
-
-    pub fn expr(&self) -> Expr {
-        Expr(self.node.branch()[1].clone())
-    }
-}
-
-impl DisplayWithContext for AssignStatement {
-    fn fmt_with<'a>(&self, ctx: DisplayContext<'a>, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.op {
-            None => write!(f, "(=")?,
-            Some(op) => write!(f, "({}=", op)?,
-        };
-        write!(
-            f,
-            " {} {})",
-            ctx.ctx.get_string(self.var()),
-            self.expr().with_ctx(ctx)
-        )
-    }
-}
-
-impl_variant!(StatementKind, AssignStatement);
-impl_has_location!(AssignStatement, node);
 
 /// A block statement is composed of multiple statements together
 #[derive(Clone, Debug)]
