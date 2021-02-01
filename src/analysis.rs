@@ -176,6 +176,8 @@ pub enum Expr {
     UnaryExpr(UnaryOp, Box<Expr>),
     /// Referencing a variable, to form an expression
     VarExpr(VariableID),
+    /// An expression assigning to a variable
+    AssignExpr(VariableID, Box<Expr>),
     /// An integer literal as an expression
     IntExpr(u32),
 }
@@ -189,6 +191,7 @@ impl fmt::Display for Expr {
             }
             Expr::UnaryExpr(op, e) => write!(f, "({} {})", op, e),
             Expr::VarExpr(v) => write!(f, "{}", v),
+            Expr::AssignExpr(v, e) => write!(f, "(= {} {})", v, e),
             Expr::FunctionCall(func, params) => {
                 write!(f, "({}", func)?;
                 for p in params {
@@ -213,8 +216,6 @@ pub enum Statement {
     If(Expr, Box<Statement>, Option<Box<Statement>>),
     /// Define a new variable, with a given expression as its value
     Var(VariableID, Expr),
-    /// Assign a value to a variable that exists
-    Assign(VariableID, Expr),
 }
 
 impl DisplayWithContext for Statement {
@@ -224,7 +225,6 @@ impl DisplayWithContext for Statement {
             Statement::Return(None) => write!(f, "return"),
             Statement::Return(Some(e)) => write!(f, "return {}", e),
             Statement::Var(v, e) => write!(f, "var {} = {}", v, e),
-            Statement::Assign(v, e) => write!(f, "{} = {}", v, e),
             Statement::If(cond, if_branch, else_branch) => match else_branch {
                 None => write!(f, "(if {} {})", cond, if_branch.with_ctx(ctx)),
                 Some(branch) => write!(
@@ -592,6 +592,38 @@ impl Analyzer {
         Ok((Expr::VarExpr(id), var_typ))
     }
 
+    fn assign_expr(&mut self, assign: parser::AssignExpr) -> AnalysisResult<(Expr, BuiltinType)> {
+        let name = assign.var();
+        let id = self
+            .scopes
+            .get(name)
+            .ok_or(ErrorType::UndefinedVar(name).at(assign.var_location().clone()))?;
+        let var_typ = self.variable_table[id].typ;
+        let (expr, expr_typ) = self.expr(assign.expr())?;
+        let expr = match assign.op {
+            None => expr,
+            Some(op) => {
+                let (maybe_l_typ, maybe_r_typ, out_typ) = op.types();
+                if let Some(l_typ) = maybe_l_typ {
+                    self.constraints.push(
+                        ConstraintType::SameType(l_typ, var_typ).at(assign.var_location().clone()),
+                    );
+                }
+                if let Some(r_typ) = maybe_r_typ {
+                    self.constraints.push(
+                        ConstraintType::SameType(r_typ, expr_typ)
+                            .at(assign.expr().location().clone()),
+                    );
+                }
+                self.constraints.push(
+                    ConstraintType::SameType(out_typ, var_typ).at(assign.var_location().clone()),
+                );
+                Expr::BinExpr(op, Box::new(Expr::VarExpr(id)), Box::new(expr))
+            }
+        };
+        Ok((Expr::AssignExpr(id, Box::new(expr)), var_typ))
+    }
+
     fn expr(&mut self, expr: parser::Expr) -> AnalysisResult<(Expr, BuiltinType)> {
         match expr.kind() {
             ExprKind::BinExpr(expr) => self.bin_expr(expr),
@@ -599,6 +631,7 @@ impl Analyzer {
             ExprKind::IntLitExpr(expr) => self.int_lit_expr(expr),
             ExprKind::UnaryExpr(expr) => self.unary_expr(expr),
             ExprKind::VarExpr(expr) => self.var_expr(expr),
+            ExprKind::AssignExpr(expr) => self.assign_expr(expr),
         }
     }
 
@@ -663,41 +696,6 @@ impl Analyzer {
         }
     }
 
-    fn assign_statement(
-        &mut self,
-        statement: parser::AssignStatement,
-    ) -> AnalysisResult<Statement> {
-        let name = statement.var();
-        let id = self
-            .scopes
-            .get(name)
-            .ok_or(ErrorType::UndefinedVar(name).at(statement.location().clone()))?;
-        let var_typ = self.variable_table[id].typ;
-        let (expr, typ) = self.expr(statement.expr())?;
-        let assign_expr = match statement.op {
-            None => expr,
-            Some(op) => {
-                let (maybe_l_typ, maybe_r_typ, out_typ) = op.types();
-                if let Some(l_typ) = maybe_l_typ {
-                    self.constraints.push(
-                        ConstraintType::SameType(l_typ, var_typ).at(statement.location().clone()),
-                    );
-                }
-                if let Some(r_typ) = maybe_r_typ {
-                    self.constraints.push(
-                        ConstraintType::SameType(r_typ, typ)
-                            .at(statement.expr().location().clone()),
-                    );
-                }
-                self.constraints.push(
-                    ConstraintType::SameType(out_typ, var_typ).at(statement.location().clone()),
-                );
-                Expr::BinExpr(op, Box::new(Expr::VarExpr(id)), Box::new(expr))
-            }
-        };
-        Ok(Statement::Assign(id, assign_expr))
-    }
-
     fn statement(&mut self, statement: parser::Statement) -> AnalysisResult<Statement> {
         match statement.kind() {
             StatementKind::BlockStatement(block) => self.block_statement(block),
@@ -705,7 +703,6 @@ impl Analyzer {
             StatementKind::IfStatement(statement) => self.if_statement(statement),
             StatementKind::VarStatement(statement) => self.var_statement(statement),
             StatementKind::ReturnStatement(statement) => self.return_statement(statement),
-            StatementKind::AssignStatement(statement) => self.assign_statement(statement),
         }
     }
 
