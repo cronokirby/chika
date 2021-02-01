@@ -520,34 +520,15 @@ impl Analyzer {
     fn bin_expr(&mut self, expr: parser::BinExpr) -> AnalysisResult<(Expr, BuiltinType)> {
         let (lhs, l_typ) = self.expr(expr.lhs())?;
         let (rhs, r_typ) = self.expr(expr.rhs())?;
-        let typ = match expr.op {
-            BinOp::Add | BinOp::Div | BinOp::Mul | BinOp::Sub | BinOp::BitOr | BinOp::BitAnd => {
-                self.constraints
-                    .push(ConstraintType::SameType(I32, l_typ).at(expr.lhs().location().clone()));
-                self.constraints
-                    .push(ConstraintType::SameType(I32, r_typ).at(expr.rhs().location().clone()));
-                I32
-            }
-            BinOp::And | BinOp::Or => {
-                self.constraints
-                    .push(ConstraintType::SameType(Bool, l_typ).at(expr.lhs().location().clone()));
-                self.constraints
-                    .push(ConstraintType::SameType(Bool, r_typ).at(expr.rhs().location().clone()));
-                Bool
-            }
-            BinOp::Less | BinOp::LessEqual | BinOp::Greater | BinOp::GreaterEqual => {
-                self.constraints
-                    .push(ConstraintType::SameType(I32, l_typ).at(expr.lhs().location().clone()));
-                self.constraints
-                    .push(ConstraintType::SameType(I32, r_typ).at(expr.rhs().location().clone()));
-                Bool
-            }
-            BinOp::Equal | BinOp::NotEqual => {
-                self.constraints
-                    .push(ConstraintType::SameType(l_typ, r_typ).at(expr.rhs().location().clone()));
-                Bool
-            }
-        };
+        let (maybe_expected_l, maybe_expected_r, typ) = expr.op.types();
+        if let Some(expected_l) = maybe_expected_l {
+            self.constraints
+                .push(ConstraintType::SameType(expected_l, l_typ).at(expr.lhs().location().clone()))
+        }
+        if let Some(expected_r) = maybe_expected_r {
+            self.constraints
+                .push(ConstraintType::SameType(expected_r, r_typ).at(expr.rhs().location().clone()))
+        }
         Ok((Expr::BinExpr(expr.op, Box::new(lhs), Box::new(rhs)), typ))
     }
 
@@ -682,8 +663,39 @@ impl Analyzer {
         }
     }
 
-    fn assign_statement(&mut self, statement: parser::AssignStatement) -> AnalysisResult<Statement> {
-        unimplemented!()
+    fn assign_statement(
+        &mut self,
+        statement: parser::AssignStatement,
+    ) -> AnalysisResult<Statement> {
+        let name = statement.var();
+        let id = self
+            .scopes
+            .get(name)
+            .ok_or(ErrorType::UndefinedVar(name).at(statement.location().clone()))?;
+        let var_typ = self.variable_table[id].typ;
+        let (expr, typ) = self.expr(statement.expr())?;
+        let assign_expr = match statement.op {
+            None => expr,
+            Some(op) => {
+                let (maybe_l_typ, maybe_r_typ, out_typ) = op.types();
+                if let Some(l_typ) = maybe_l_typ {
+                    self.constraints.push(
+                        ConstraintType::SameType(l_typ, var_typ).at(statement.location().clone()),
+                    );
+                }
+                if let Some(r_typ) = maybe_r_typ {
+                    self.constraints.push(
+                        ConstraintType::SameType(r_typ, typ)
+                            .at(statement.expr().location().clone()),
+                    );
+                }
+                self.constraints.push(
+                    ConstraintType::SameType(out_typ, var_typ).at(statement.location().clone()),
+                );
+                Expr::BinExpr(op, Box::new(Expr::VarExpr(id)), Box::new(expr))
+            }
+        };
+        Ok(Statement::Assign(id, assign_expr))
     }
 
     fn statement(&mut self, statement: parser::Statement) -> AnalysisResult<Statement> {

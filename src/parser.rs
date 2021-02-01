@@ -394,6 +394,20 @@ pub enum BinOp {
     GreaterEqual,
 }
 
+impl BinOp {
+    pub fn types(&self) -> (Option<BuiltinType>, Option<BuiltinType>, BuiltinType) {
+        use BinOp::*;
+        use BuiltinType::*;
+
+        match self {
+            Add | Mul | Sub | Div | BitOr | BitAnd => (Some(I32), Some(I32), I32),
+            Or | And => (Some(Bool), Some(Bool), Bool),
+            Equal | NotEqual => (None, None, Bool),
+            Less | LessEqual | Greater | GreaterEqual => (Some(I32), Some(I32), Bool),
+        }
+    }
+}
+
 impl fmt::Display for BinOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
