@@ -38,6 +38,13 @@ enum Tag {
     UnaryExprNegate,
     UnaryExprNot,
     VarExpr,
+    Assign,
+    AssignAdd,
+    AssignMul,
+    AssignSub,
+    AssignDiv,
+    AssignBitOr,
+    AssignBitAnd,
     FunctionExpr,
     ExprStatement,
     ReturnStatement,
@@ -490,6 +497,8 @@ pub enum StatementKind {
     ReturnStatement(ReturnStatement),
     /// The creation of a new variable
     VarStatement(VarStatement),
+    /// Assign a value to some variable
+    AssignStatement(AssignStatement),
     /// A block containing multiple statements
     BlockStatement(BlockStatement),
     /// An if statement, possibly containing an else
@@ -506,6 +515,7 @@ impl DisplayWithContext for StatementKind {
             StatementKind::BlockStatement(s) => s.fmt_with(ctx, f),
             StatementKind::IfStatement(s) => s.fmt_with(ctx, f),
             StatementKind::ExprStatement(s) => s.fmt_with(ctx, f),
+            StatementKind::AssignStatement(s) => s.fmt_with(ctx, f),
         }
     }
 }
@@ -605,6 +615,42 @@ impl DisplayWithContext for VarStatement {
 
 impl_variant!(StatementKind, VarStatement);
 impl_has_location!(VarStatement);
+
+/// A statement assigning some operator modified expression to some variable
+#[derive(Clone, Debug)]
+pub struct AssignStatement {
+    pub op: Option<BinOp>,
+    node: Rc<Node>,
+}
+
+impl AssignStatement {
+    /// The string of the variable being assigned to
+    pub fn var(&self) -> StringID {
+        self.node.branch()[0].string()
+    }
+
+    pub fn expr(&self) -> Expr {
+        Expr(self.node.branch()[1].clone())
+    }
+}
+
+impl DisplayWithContext for AssignStatement {
+    fn fmt_with<'a>(&self, ctx: DisplayContext<'a>, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.op {
+            None => write!(f, "(=")?,
+            Some(op) => write!(f, "({}=", op)?,
+        };
+        write!(
+            f,
+            " {} {})",
+            ctx.ctx.get_string(self.var()),
+            self.expr().with_ctx(ctx)
+        )
+    }
+}
+
+impl_variant!(StatementKind, AssignStatement);
+impl_has_location!(AssignStatement, node);
 
 /// A block statement is composed of multiple statements together
 #[derive(Clone, Debug)]
