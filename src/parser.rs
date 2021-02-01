@@ -66,6 +66,8 @@ enum NodeShape {
     Type(BuiltinType),
     /// This node branches off to contain other nodes
     Branch(Vec<Rc<Node>>),
+    /// This node doesn't branch off
+    Empty,
 }
 
 /// Represents a single raw Node in our AST.
@@ -1146,12 +1148,20 @@ impl Parser {
 
     fn return_statement(&mut self) -> ParseResult<Rc<Node>> {
         let start = self.expect(Return)?;
-        let expr = self.expr()?;
+        let expr = if self.check(Semicolon) {
+            None
+        } else {
+            Some(self.expr()?)
+        };
         let end = self.expect(Semicolon)?;
+        let (tag, shape) = match expr {
+            None => (Tag::ReturnEmptyStatement, NodeShape::Empty),
+            Some(expr) => (Tag::ReturnStatement, NodeShape::Branch(vec![expr])),
+        };
         Ok(Rc::new(Node {
             location: start.to(&end),
-            tag: Tag::ReturnStatement,
-            shape: NodeShape::Branch(vec![expr]),
+            tag,
+            shape,
         }))
     }
 
@@ -1460,5 +1470,16 @@ mod test {
         }
         "#,
         );
+    }
+
+    #[test]
+    fn empty_return_should_parse() {
+        should_parse(
+            r#"
+        fn foo(): Unit {
+            return;
+        }
+        "#,
+        )
     }
 }
