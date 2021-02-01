@@ -975,20 +975,27 @@ pub type ParseResult<T> = Result<T, Error>;
 /// For tokens for which this doesn't make sense, this returns None.
 fn binding_power(token: TokenType) -> Option<(u8, u8, Tag)> {
     match token {
-        OrOr => Some((1, 2, Tag::BinExprOr)),
-        AndAnd => Some((3, 4, Tag::BinExprAnd)),
-        Or => Some((5, 6, Tag::BinExprBitOr)),
-        And => Some((7, 8, Tag::BinExprBitAnd)),
-        EqualsEquals => Some((9, 10, Tag::BinExprEqual)),
-        BangEquals => Some((9, 10, Tag::BinExprNotEqual)),
-        Less => Some((11, 12, Tag::BinExprLess)),
-        LessEqual => Some((11, 12, Tag::BinExprLessEqual)),
-        Greater => Some((11, 12, Tag::BinExprGreater)),
-        GreaterEqual => Some((11, 12, Tag::BinExprGreaterEqual)),
-        Plus => Some((13, 14, Tag::BinExprAdd)),
-        Minus => Some((13, 14, Tag::BinExprSub)),
-        Times => Some((15, 16, Tag::BinExprMul)),
-        Div => Some((17, 18, Tag::BinExprDiv)),
+        Equals => Some((2, 1, Tag::AssignExpr)),
+        PlusEqual => Some((2, 1, Tag::AssignExprAdd)),
+        MinusEqual => Some((2, 1, Tag::AssignExprSub)),
+        TimesEqual => Some((2, 1, Tag::AssignExprMul)),
+        DivEqual => Some((2, 1, Tag::AssignExprDiv)),
+        AndEqual => Some((2, 1, Tag::AssignExprBitAnd)),
+        OrEqual => Some((2, 1, Tag::AssignExprBitOr)),
+        OrOr => Some((3, 4, Tag::BinExprOr)),
+        AndAnd => Some((5, 6, Tag::BinExprAnd)),
+        Or => Some((7, 8, Tag::BinExprBitOr)),
+        And => Some((9, 10, Tag::BinExprBitAnd)),
+        EqualsEquals => Some((11, 12, Tag::BinExprEqual)),
+        BangEquals => Some((11, 12, Tag::BinExprNotEqual)),
+        Less => Some((13, 14, Tag::BinExprLess)),
+        LessEqual => Some((13, 14, Tag::BinExprLessEqual)),
+        Greater => Some((13, 14, Tag::BinExprGreater)),
+        GreaterEqual => Some((13, 14, Tag::BinExprGreaterEqual)),
+        Plus => Some((15, 16, Tag::BinExprAdd)),
+        Minus => Some((15, 16, Tag::BinExprSub)),
+        Times => Some((17, 18, Tag::BinExprMul)),
+        Div => Some((19, 20, Tag::BinExprDiv)),
         _ => None,
     }
 }
@@ -998,8 +1005,8 @@ fn binding_power(token: TokenType) -> Option<(u8, u8, Tag)> {
 /// If this token isn't a prefix operaotr, this returns None
 fn prefix_binding_power(token: TokenType) -> Option<((), u8, Tag)> {
     match token {
-        Minus => Some(((), 20, Tag::UnaryExprNegate)),
-        Bang => Some(((), 20, Tag::UnaryExprNot)),
+        Minus => Some(((), 22, Tag::UnaryExprNegate)),
+        Bang => Some(((), 22, Tag::UnaryExprNot)),
         _ => None,
     }
 }
@@ -1576,6 +1583,22 @@ mod test {
             r#"
         fn foo(): Unit {
             return;
+        }
+        "#,
+        )
+    }
+
+    #[test]
+    fn assignments_should_parse() {
+        should_parse(
+            r#"
+        fn foo(): Unit {
+            var x: I32 = 3;
+            x += x += x *= x /= x -= x |= x;
+            x -= x;
+            x /= x;
+            x |= x;
+            x &= x;
         }
         "#,
         )
