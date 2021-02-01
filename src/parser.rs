@@ -41,6 +41,7 @@ enum Tag {
     FunctionExpr,
     ExprStatement,
     ReturnStatement,
+    ReturnEmptyStatement,
     VarStatement,
     IfStatement,
     IfElseStatement,
@@ -513,7 +514,8 @@ pub struct Statement(Rc<Node>);
 impl Statement {
     pub fn kind(&self) -> StatementKind {
         match &self.0.tag {
-            Tag::ReturnStatement => ReturnStatement(self.0.clone()).into(),
+            Tag::ReturnStatement => ReturnStatement::new(false, self.0.clone()).into(),
+            Tag::ReturnEmptyStatement => ReturnStatement::new(true, self.0.clone()).into(),
             Tag::VarStatement => VarStatement(self.0.clone()).into(),
             Tag::BlockStatement => BlockStatement(self.0.clone()).into(),
             Tag::IfStatement => IfStatement::new(false, self.0.clone()).into(),
@@ -534,23 +536,37 @@ impl_has_location!(Statement);
 
 /// A statement returning the value of some expression
 #[derive(Clone, Debug)]
-pub struct ReturnStatement(Rc<Node>);
+pub struct ReturnStatement {
+    empty: bool,
+    node: Rc<Node>,
+}
 
 impl ReturnStatement {
+    fn new(empty: bool, node: Rc<Node>) -> Self {
+        ReturnStatement { empty, node }
+    }
+
     /// The underlying expression being returned
-    pub fn expr(&self) -> Expr {
-        Expr(self.0.branch()[0].clone())
+    pub fn expr(&self) -> Option<Expr> {
+        if self.empty {
+            None
+        } else {
+            Some(Expr(self.node.branch()[0].clone()))
+        }
     }
 }
 
 impl DisplayWithContext for ReturnStatement {
     fn fmt_with(&self, ctx: DisplayContext<'_>, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "(return {})", self.expr().with_ctx(ctx))
+        match self.expr() {
+            None => write!(f, "(return)"),
+            Some(e) => write!(f, "(return {})", e.with_ctx(ctx)),
+        }
     }
 }
 
 impl_variant!(StatementKind, ReturnStatement);
-impl_has_location!(ReturnStatement);
+impl_has_location!(ReturnStatement, node);
 
 /// A statement defining a new variable
 #[derive(Clone, Debug)]
