@@ -381,11 +381,9 @@ impl<'a> Iterator for Lexer<'a> {
             }
             c if c.is_uppercase() => {
                 let ident = self.continue_identifier(c);
-                match ident.as_str() {
-                    "I32" => BuiltinTypeName(builtin::Type::I32),
-                    "Unit" => BuiltinTypeName(builtin::Type::Unit),
-                    "Bool" => BuiltinTypeName(builtin::Type::Bool),
-                    _ => panic!("Unknown type: {}", ident),
+                match builtin::Type::from_name(&ident) {
+                    None => panic!("Unknown type: {}", ident),
+                    Some(t) => BuiltinTypeName(t),
                 }
             }
             c if c.is_alphabetic() || c == '_' => {

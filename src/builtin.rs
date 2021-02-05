@@ -11,14 +11,24 @@ pub enum Type {
     Bool,
 }
 
+impl Type {
+    /// Try and recognize a known type name
+    pub fn from_name(name: &str) -> Option<Type> {
+        match name {
+            "I32" => Some(Type::I32),
+            "Unit" => Some(Type::Unit),
+            "Bool" => Some(Type::Bool),
+            _ => None,
+        }
+    }
+}
+
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use Type::*;
-
         match self {
-            I32 => write!(f, "I32"),
-            Unit => write!(f, "Unit"),
-            Bool => write!(f, "Bool"),
+            Type::I32 => write!(f, "I32"),
+            Type::Unit => write!(f, "Unit"),
+            Type::Bool => write!(f, "Bool"),
         }
     }
 }
