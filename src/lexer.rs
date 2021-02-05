@@ -4,7 +4,7 @@ use crate::context::{
     Context, Diagnostic, DisplayContext, DisplayWithContext, IsDiagnostic, Location, StringID,
 };
 use crate::interner::StringInterner;
-use crate::types::BuiltinType;
+use crate::core::types::BuiltinType;
 use crate::{codespan_reporting::diagnostic::Label, context::FileID};
 use std::fmt;
 

@@ -9,7 +9,7 @@ use crate::{
     },
     lexer::Token,
     lexer::TokenType,
-    types::BuiltinType,
+    core::types::BuiltinType,
 };
 use std::fmt;
 use TokenType::*;

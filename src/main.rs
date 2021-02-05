@@ -4,7 +4,7 @@ mod errors;
 mod interner;
 mod lexer;
 mod parser;
-mod types;
+mod core;
 
 use crate::context::DisplayWithContext;
 use analysis::analyze;

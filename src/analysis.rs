@@ -4,7 +4,7 @@ use crate::{
 };
 use crate::{
     context::{DisplayContext, DisplayWithContext, StringID},
-    types::BuiltinType,
+    core::types::BuiltinType,
 };
 use codespan_reporting::diagnostic::Label;
 use core::fmt;
