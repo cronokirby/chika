@@ -3,13 +3,13 @@ use std::ops::Fn;
 use std::rc::Rc;
 
 use crate::{
+    builtin::Type,
     context::{
         Context, Diagnostic, DisplayContext, DisplayWithContext, FileID, IsDiagnostic, Location,
         StringID,
     },
     lexer::Token,
     lexer::TokenType,
-    core::types::BuiltinType,
 };
 use std::fmt;
 use TokenType::*;
@@ -70,7 +70,7 @@ enum NodeShape {
     /// This node is a terminal reference to an integer
     IntLit(u32),
     /// This node is a termainl reference to a builtin type
-    Type(BuiltinType),
+    Type(Type),
     /// This node branches off to contain other nodes
     Branch(Vec<Rc<Node>>),
     /// This node doesn't branch off
@@ -107,7 +107,7 @@ impl Node {
         }
     }
 
-    fn typ(&self) -> BuiltinType {
+    fn typ(&self) -> Type {
         match &self.shape {
             NodeShape::Type(t) => *t,
             other => panic!("expected type, found: {:?}", other),
@@ -472,9 +472,9 @@ pub enum BinOp {
 }
 
 impl BinOp {
-    pub fn types(&self) -> (Option<BuiltinType>, Option<BuiltinType>, BuiltinType) {
+    pub fn types(&self) -> (Option<Type>, Option<Type>, Type) {
         use BinOp::*;
-        use BuiltinType::*;
+        use Type::*;
 
         match self {
             Add | Mul | Sub | Div | BitOr | BitAnd => (Some(I32), Some(I32), I32),
@@ -679,7 +679,7 @@ impl VarStatement {
     }
 
     /// The type of the variable being declared
-    pub fn typ(&self) -> BuiltinType {
+    pub fn typ(&self) -> Type {
         self.0.branch()[1].typ()
     }
 
@@ -828,7 +828,7 @@ impl Function {
     }
 
     /// The return type for this function
-    pub fn return_type(&self) -> BuiltinType {
+    pub fn return_type(&self) -> Type {
         let branch = self.0.branch();
         branch[branch.len() - 2].typ()
     }
@@ -844,7 +844,7 @@ impl Function {
     }
 
     /// The ith parameter to this function
-    pub fn param(&self, i: usize) -> (StringID, BuiltinType) {
+    pub fn param(&self, i: usize) -> (StringID, Type) {
         let j = 2 * i + 1;
         let string = self.0.branch()[j].string();
         let typ = self.0.branch()[j + 1].typ();
@@ -1108,7 +1108,7 @@ impl Parser {
         })
     }
 
-    fn extract_type(&mut self) -> ParseResult<(Location, BuiltinType)> {
+    fn extract_type(&mut self) -> ParseResult<(Location, Type)> {
         self.extract(ErrorType::ExpectedType, |tok| match tok {
             TokenType::BuiltinTypeName(n) => Some(n),
             _ => None,

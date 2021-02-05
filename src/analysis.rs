@@ -4,14 +4,14 @@ use crate::{
 };
 use crate::{
     context::{DisplayContext, DisplayWithContext, StringID},
-    core::types::BuiltinType,
+    builtin::Type,
 };
 use codespan_reporting::diagnostic::Label;
 use core::fmt;
 use parser::{BinOp, ExprKind, HasLocation, StatementKind, UnaryOp};
 use std::collections::HashMap;
 use std::ops::Index;
-use BuiltinType::*;
+use Type::*;
 
 /// Represents the information we have about some function
 #[derive(Clone, Debug)]
@@ -19,15 +19,15 @@ pub struct Function {
     /// The original name of this function
     pub name: StringID,
     /// The return type of this function
-    pub return_type: BuiltinType,
+    pub return_type: Type,
     /// The types of the arguments, if any.
     ///
     /// This also serves as a way of storing the number of arguments, as well
-    pub arg_types: Vec<BuiltinType>,
+    pub arg_types: Vec<Type>,
 }
 
 impl Function {
-    fn new(name: StringID, return_type: BuiltinType, arg_types: Vec<BuiltinType>) -> Self {
+    fn new(name: StringID, return_type: Type, arg_types: Vec<Type>) -> Self {
         Function {
             name,
             return_type,
@@ -104,11 +104,11 @@ pub struct Variable {
     /// The original name the variable had
     pub name: StringID,
     /// The type of this variable
-    pub typ: BuiltinType,
+    pub typ: Type,
 }
 
 impl Variable {
-    fn new(name: StringID, typ: BuiltinType) -> Self {
+    fn new(name: StringID, typ: Type) -> Self {
         Variable { name, typ }
     }
 }
@@ -347,11 +347,11 @@ impl Scopes {
 /// Represents a kind of constraint we generate when checking types
 enum ConstraintType {
     /// A function must have a certain return type
-    ReturnType(FunctionID, BuiltinType),
+    ReturnType(FunctionID, Type),
     /// A function must be able to never return a value
     NoReturn(FunctionID),
     /// We've detected that two types must match up
-    SameType(BuiltinType, BuiltinType),
+    SameType(Type, Type),
 }
 
 impl ConstraintType {
@@ -376,9 +376,9 @@ enum ErrorType {
     FunctionRedefinition(StringID),
     UndefinedVar(StringID),
     UndefinedFunction(StringID),
-    TypeMismatch(BuiltinType, BuiltinType),
-    NoReturnInFunction(StringID, BuiltinType),
-    BadReturnType(StringID, BuiltinType, BuiltinType),
+    TypeMismatch(Type, Type),
+    NoReturnInFunction(StringID, Type),
+    BadReturnType(StringID, Type, Type),
     IncorrectArgumentCount(StringID, usize, usize),
 }
 
@@ -517,7 +517,7 @@ impl Analyzer {
         }
     }
 
-    fn bin_expr(&mut self, expr: parser::BinExpr) -> AnalysisResult<(Expr, BuiltinType)> {
+    fn bin_expr(&mut self, expr: parser::BinExpr) -> AnalysisResult<(Expr, Type)> {
         let (lhs, l_typ) = self.expr(expr.lhs())?;
         let (rhs, r_typ) = self.expr(expr.rhs())?;
         let (maybe_expected_l, maybe_expected_r, typ) = expr.op.types();
@@ -532,7 +532,7 @@ impl Analyzer {
         Ok((Expr::BinExpr(expr.op, Box::new(lhs), Box::new(rhs)), typ))
     }
 
-    fn function_expr(&mut self, expr: parser::FunctionExpr) -> AnalysisResult<(Expr, BuiltinType)> {
+    fn function_expr(&mut self, expr: parser::FunctionExpr) -> AnalysisResult<(Expr, Type)> {
         let name = expr.function();
         let &id = self
             .function_ids
@@ -561,11 +561,11 @@ impl Analyzer {
         Ok((Expr::FunctionCall(id, params), typ))
     }
 
-    fn int_lit_expr(&mut self, expr: parser::IntLitExpr) -> AnalysisResult<(Expr, BuiltinType)> {
+    fn int_lit_expr(&mut self, expr: parser::IntLitExpr) -> AnalysisResult<(Expr, Type)> {
         Ok((Expr::IntExpr(expr.int_lit()), I32))
     }
 
-    fn unary_expr(&mut self, expr: parser::UnaryExpr) -> AnalysisResult<(Expr, BuiltinType)> {
+    fn unary_expr(&mut self, expr: parser::UnaryExpr) -> AnalysisResult<(Expr, Type)> {
         let (operand, operand_typ) = self.expr(expr.expr())?;
         let typ = match expr.op {
             UnaryOp::Negate => {
@@ -582,7 +582,7 @@ impl Analyzer {
         Ok((Expr::UnaryExpr(expr.op, Box::new(operand)), typ))
     }
 
-    fn var_expr(&mut self, expr: parser::VarExpr) -> AnalysisResult<(Expr, BuiltinType)> {
+    fn var_expr(&mut self, expr: parser::VarExpr) -> AnalysisResult<(Expr, Type)> {
         let name = expr.var();
         let id = self
             .scopes
@@ -592,7 +592,7 @@ impl Analyzer {
         Ok((Expr::VarExpr(id), var_typ))
     }
 
-    fn assign_expr(&mut self, assign: parser::AssignExpr) -> AnalysisResult<(Expr, BuiltinType)> {
+    fn assign_expr(&mut self, assign: parser::AssignExpr) -> AnalysisResult<(Expr, Type)> {
         let name = assign.var();
         let id = self
             .scopes
@@ -624,7 +624,7 @@ impl Analyzer {
         Ok((Expr::AssignExpr(id, Box::new(expr)), var_typ))
     }
 
-    fn expr(&mut self, expr: parser::Expr) -> AnalysisResult<(Expr, BuiltinType)> {
+    fn expr(&mut self, expr: parser::Expr) -> AnalysisResult<(Expr, Type)> {
         match expr.kind() {
             ExprKind::BinExpr(expr) => self.bin_expr(expr),
             ExprKind::FunctionExpr(expr) => self.function_expr(expr),

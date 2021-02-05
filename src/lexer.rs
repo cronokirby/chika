@@ -4,7 +4,7 @@ use crate::context::{
     Context, Diagnostic, DisplayContext, DisplayWithContext, IsDiagnostic, Location, StringID,
 };
 use crate::interner::StringInterner;
-use crate::core::types::BuiltinType;
+use crate::builtin::Type;
 use crate::{codespan_reporting::diagnostic::Label, context::FileID};
 use std::fmt;
 
@@ -84,7 +84,7 @@ pub enum TokenType {
     /// A variable name
     VarName(StringID),
     /// A builtin type, as a token
-    BuiltinTypeName(BuiltinType),
+    BuiltinTypeName(Type),
 }
 
 impl DisplayWithContext for TokenType {
@@ -372,9 +372,9 @@ impl<'a> Iterator for Lexer<'a> {
             c if c.is_uppercase() => {
                 let ident = self.continue_identifier(c);
                 match ident.as_str() {
-                    "I32" => BuiltinTypeName(BuiltinType::I32),
-                    "Unit" => BuiltinTypeName(BuiltinType::Unit),
-                    "Bool" => BuiltinTypeName(BuiltinType::Bool),
+                    "I32" => BuiltinTypeName(Type::I32),
+                    "Unit" => BuiltinTypeName(Type::Unit),
+                    "Bool" => BuiltinTypeName(Type::Bool),
                     _ => panic!("Unknown type: {}", ident),
                 }
             }

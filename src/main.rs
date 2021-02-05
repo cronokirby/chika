@@ -1,10 +1,10 @@
 mod analysis;
+mod builtin;
 mod context;
 mod errors;
 mod interner;
 mod lexer;
 mod parser;
-mod core;
 
 use crate::context::DisplayWithContext;
 use analysis::analyze;
