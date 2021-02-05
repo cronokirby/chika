@@ -240,7 +240,7 @@ impl<'a> Lexer<'a> {
     fn continue_identifier(&mut self, start: char) -> String {
         let mut ident = String::from(start);
         while let Some(&peek) = self.chars.peek() {
-            if !peek.is_alphanumeric() {
+            if !(peek.is_alphanumeric() || peek == '_') {
                 break;
             }
             self.next_char();
@@ -378,7 +378,7 @@ impl<'a> Iterator for Lexer<'a> {
                     _ => panic!("Unknown type: {}", ident),
                 }
             }
-            c if c.is_alphabetic() => {
+            c if c.is_alphabetic() || c == '_' => {
                 let ident = self.continue_identifier(c);
                 match ident.as_str() {
                     "fn" => Fn,
@@ -471,5 +471,10 @@ mod test {
     #[test]
     fn assignment_operators_lex() {
         should_lex("== += *= /= -= &= |=");
+    }
+
+    #[test]
+    fn identifiers_with_underscores_lex() {
+        should_lex("print_int _foo");
     }
 }
