@@ -1,10 +1,10 @@
 use crate::{
-    context::{Context, Diagnostic, IsDiagnostic, Location},
-    parser,
+    builtin::{BuiltinFunction, Type},
+    context::{DisplayContext, DisplayWithContext, StringID},
 };
 use crate::{
-    context::{DisplayContext, DisplayWithContext, StringID},
-    builtin::Type,
+    context::{Context, Diagnostic, IsDiagnostic, Location},
+    parser,
 };
 use codespan_reporting::diagnostic::Label;
 use core::fmt;
@@ -170,6 +170,8 @@ impl DisplayWithContext for VariableTable {
 pub enum Expr {
     /// Calling a function, with a list of arguments
     FunctionCall(FunctionID, Vec<Expr>),
+    /// Calling a builtin function, with a list of arguments
+    BuiltinFunctionCall(BuiltinFunction, Vec<Expr>),
     /// Applying some binary operator to two expressions
     BinExpr(BinOp, Box<Expr>, Box<Expr>),
     /// Applying some unary operator to some expression
@@ -193,6 +195,13 @@ impl fmt::Display for Expr {
             Expr::VarExpr(v) => write!(f, "{}", v),
             Expr::AssignExpr(v, e) => write!(f, "(= {} {})", v, e),
             Expr::FunctionCall(func, params) => {
+                write!(f, "({}", func)?;
+                for p in params {
+                    write!(f, " {}", p)?;
+                }
+                write!(f, ")")
+            }
+            Expr::BuiltinFunctionCall(func, params) => {
                 write!(f, "({}", func)?;
                 for p in params {
                     write!(f, " {}", p)?;
@@ -380,6 +389,7 @@ enum ErrorType {
     NoReturnInFunction(StringID, Type),
     BadReturnType(StringID, Type, Type),
     IncorrectArgumentCount(StringID, usize, usize),
+    IncorrectBuiltinArgumentCount(BuiltinFunction, usize, usize),
 }
 
 impl ErrorType {
@@ -454,6 +464,17 @@ impl IsDiagnostic for Error {
                     "function `{}` takes {} arguments",
                     ctx.get_string(name),
                     expected
+                )]),
+            IncorrectBuiltinArgumentCount(name, expected, actual) => Diagnostic::error()
+                .with_message("Incorrect builtin argument count")
+                .with_labels(vec![Label::primary(self.location.file, self.location)
+                    .with_message(format!(
+                        "{} arguments instead of {}",
+                        actual, expected
+                    ))])
+                .with_notes(vec![format!(
+                    "builtin `{}` takes {} arguments",
+                    name, expected
                 )]),
         }
     }
@@ -624,6 +645,32 @@ impl Analyzer {
         Ok((Expr::AssignExpr(id, Box::new(expr)), var_typ))
     }
 
+    fn builtin_function_expr(
+        &mut self,
+        expr: parser::BuiltinFunctionExpr,
+    ) -> AnalysisResult<(Expr, Type)> {
+        let name = expr.function();
+        let (arg_types, ret_type) = name.signature();
+        let mut params = Vec::new();
+        let expected_len = arg_types.len();
+        if expected_len != expr.param_count() {
+            return Err(ErrorType::IncorrectBuiltinArgumentCount(
+                name,
+                expected_len,
+                expr.param_count(),
+            )
+            .at(expr.location().clone()));
+        }
+        for i in 0..expr.param_count() {
+            let (param, typ) = self.expr(expr.param(i))?;
+            self.constraints.push(
+                ConstraintType::SameType(arg_types[i], typ).at(expr.param(i).location().clone()),
+            );
+            params.push(param);
+        }
+        Ok((Expr::BuiltinFunctionCall(name, params), ret_type))
+    }
+
     fn expr(&mut self, expr: parser::Expr) -> AnalysisResult<(Expr, Type)> {
         match expr.kind() {
             ExprKind::BinExpr(expr) => self.bin_expr(expr),
@@ -632,6 +679,7 @@ impl Analyzer {
             ExprKind::UnaryExpr(expr) => self.unary_expr(expr),
             ExprKind::VarExpr(expr) => self.var_expr(expr),
             ExprKind::AssignExpr(expr) => self.assign_expr(expr),
+            ExprKind::BuiltinFunctionExpr(expr) => self.builtin_function_expr(expr),
         }
     }
 

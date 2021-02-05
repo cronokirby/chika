@@ -3,7 +3,7 @@ use std::ops::Fn;
 use std::rc::Rc;
 
 use crate::{
-    builtin::Type,
+    builtin::{BuiltinFunction, Type},
     context::{
         Context, Diagnostic, DisplayContext, DisplayWithContext, FileID, IsDiagnostic, Location,
         StringID,
@@ -46,6 +46,7 @@ enum Tag {
     AssignExprBitOr,
     AssignExprBitAnd,
     FunctionExpr,
+    BuiltinFunctionExpr,
     ExprStatement,
     ReturnStatement,
     ReturnEmptyStatement,
@@ -69,8 +70,10 @@ enum NodeShape {
     String(StringID),
     /// This node is a terminal reference to an integer
     IntLit(u32),
-    /// This node is a termainl reference to a builtin type
+    /// This node is a terminal reference to a builtin type
     Type(Type),
+    /// This node is a terminal reference to a builtin function
+    BuiltinFunction(BuiltinFunction),
     /// This node branches off to contain other nodes
     Branch(Vec<Rc<Node>>),
     /// This node doesn't branch off
@@ -111,6 +114,13 @@ impl Node {
         match &self.shape {
             NodeShape::Type(t) => *t,
             other => panic!("expected type, found: {:?}", other),
+        }
+    }
+
+    fn builtin_function(&self) -> BuiltinFunction {
+        match &self.shape {
+            NodeShape::BuiltinFunction(b) => *b,
+            other => panic!("expected builtin function, found: {:?}", other),
         }
     }
 
@@ -171,6 +181,8 @@ pub enum ExprKind {
     UnaryExpr(UnaryExpr),
     /// A function call, as an expression
     FunctionExpr(FunctionExpr),
+    /// A builtin function call, as an expression
+    BuiltinFunctionExpr(BuiltinFunctionExpr),
 }
 
 impl DisplayWithContext for ExprKind {
@@ -182,6 +194,7 @@ impl DisplayWithContext for ExprKind {
             ExprKind::BinExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
             ExprKind::UnaryExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
             ExprKind::FunctionExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
+            ExprKind::BuiltinFunctionExpr(e) => write!(f, "{}", e.with_ctx(ctx)),
         }
     }
 }
@@ -312,6 +325,7 @@ impl Expr {
             }
             .into(),
             Tag::FunctionExpr => FunctionExpr(self.0.clone()).into(),
+            Tag::BuiltinFunctionExpr => BuiltinFunctionExpr(self.0.clone()).into(),
             other => panic!("unexpected tag {:?}", other),
         }
     }
@@ -358,6 +372,40 @@ impl DisplayWithContext for FunctionExpr {
 
 impl_variant!(ExprKind, FunctionExpr);
 impl_has_location!(FunctionExpr);
+
+/// A function call, used as an expressi0on
+#[derive(Clone, Debug)]
+pub struct BuiltinFunctionExpr(Rc<Node>);
+
+impl BuiltinFunctionExpr {
+    /// Get the function name of this expression
+    pub fn function(&self) -> BuiltinFunction {
+        self.0.branch()[0].builtin_function()
+    }
+
+    /// The number of parameters passed to this function
+    pub fn param_count(&self) -> usize {
+        self.0.branch().len() - 1
+    }
+
+    /// The ith param passed to this function
+    pub fn param(&self, i: usize) -> Expr {
+        Expr(self.0.branch()[i + 1].clone())
+    }
+}
+
+impl DisplayWithContext for BuiltinFunctionExpr {
+    fn fmt_with<'a>(&self, ctx: DisplayContext<'a>, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(call {}", self.function())?;
+        for i in 0..self.param_count() {
+            write!(f, " {}", self.param(i).with_ctx(ctx))?;
+        }
+        write!(f, ")")
+    }
+}
+
+impl_variant!(ExprKind, BuiltinFunctionExpr);
+impl_has_location!(BuiltinFunctionExpr);
 
 /// An integer literal, used as an expression
 #[derive(Clone, Debug)]
