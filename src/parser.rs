@@ -1163,12 +1163,23 @@ impl Parser {
         })
     }
 
-    fn function_call(&mut self, function: StringID, start: Location) -> ParseResult<Rc<Node>> {
-        let mut params = vec![Rc::new(Node {
-            location: start,
-            tag: Tag::Name,
-            shape: NodeShape::String(function),
-        })];
+    fn function_call(
+        &mut self,
+        function: Result<StringID, BuiltinFunction>,
+        start: Location,
+    ) -> ParseResult<Rc<Node>> {
+        let mut params = match function {
+            Ok(name) => vec![Rc::new(Node {
+                location: start,
+                tag: Tag::Name,
+                shape: NodeShape::String(name),
+            })],
+            Err(func) => vec![Rc::new(Node {
+                location: start,
+                tag: Tag::Name,
+                shape: NodeShape::BuiltinFunction(func),
+            })],
+        };
         self.expect(OpenParens)?;
 
         if !self.check(CloseParens) {
@@ -1181,16 +1192,22 @@ impl Parser {
         }
         let end = self.expect(CloseParens)?;
 
+        let tag = match function {
+            Ok(_) => Tag::FunctionExpr,
+            Err(_) => Tag::BuiltinFunctionExpr,
+        };
+
         Ok(Rc::new(Node {
             location: start.to(&end),
-            tag: Tag::FunctionExpr,
+            tag,
             shape: NodeShape::Branch(params),
         }))
     }
 
     fn atom(&mut self) -> ParseResult<Rc<Node>> {
         let (location, res) = self.extract(ErrorType::ExpectedExpr, |tok| match tok {
-            TokenType::VarName(n) => Some(Err(n)),
+            TokenType::VarName(n) => Some(Err(Ok(n))),
+            TokenType::BuiltinFunction(f) => Some(Err(Err(f))),
             TokenType::IntLit(i) => Some(Ok(i)),
             _ => None,
         })?;
@@ -1199,10 +1216,14 @@ impl Parser {
                 if self.check(OpenParens) {
                     self.function_call(n, location)?
                 } else {
+                    // This will fail with the right error if we see a builtin function
+                    if let Err(_) = n {
+                        self.expect(OpenParens)?;
+                    };
                     Rc::new(Node {
                         location,
                         tag: Tag::VarExpr,
-                        shape: NodeShape::String(n),
+                        shape: NodeShape::String(n.unwrap()),
                     })
                 }
             }
@@ -1607,6 +1628,8 @@ mod test {
             foo(1, 2);
             bar(x, y, z);
             bar();
+
+            #print_i32();
         }
         "#,
         );
