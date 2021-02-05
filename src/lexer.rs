@@ -1,10 +1,10 @@
 use std::{iter::Peekable, str::Chars};
 
+use crate::builtin;
 use crate::context::{
     Context, Diagnostic, DisplayContext, DisplayWithContext, IsDiagnostic, Location, StringID,
 };
 use crate::interner::StringInterner;
-use crate::builtin::Type;
 use crate::{codespan_reporting::diagnostic::Label, context::FileID};
 use std::fmt;
 
@@ -84,7 +84,9 @@ pub enum TokenType {
     /// A variable name
     VarName(StringID),
     /// A builtin type, as a token
-    BuiltinTypeName(Type),
+    BuiltinTypeName(builtin::Type),
+    /// A builtin function, as a token
+    BuiltinFunction(builtin::BuiltinFunction),
 }
 
 impl DisplayWithContext for TokenType {
@@ -129,6 +131,7 @@ impl DisplayWithContext for TokenType {
             IntLit(i) => write!(f, "{}", i),
             VarName(id) => write!(f, "{}", ctx.ctx.get_string(id)),
             BuiltinTypeName(b) => write!(f, "{}", b),
+            BuiltinFunction(b) => write!(f, "{}", b),
         }
     }
 }
@@ -365,6 +368,13 @@ impl<'a> Iterator for Lexer<'a> {
                 }
                 _ => Bang,
             },
+            '#' => {
+                let name = self.continue_identifier('#');
+                match builtin::BuiltinFunction::from_name(&name) {
+                    None => panic!("Unknown builtin: {}", name),
+                    Some(b) => BuiltinFunction(b),
+                }
+            }
             c if c.is_digit(10) => {
                 let lit = self.continue_int_lit(c);
                 IntLit(lit)
@@ -372,9 +382,9 @@ impl<'a> Iterator for Lexer<'a> {
             c if c.is_uppercase() => {
                 let ident = self.continue_identifier(c);
                 match ident.as_str() {
-                    "I32" => BuiltinTypeName(Type::I32),
-                    "Unit" => BuiltinTypeName(Type::Unit),
-                    "Bool" => BuiltinTypeName(Type::Bool),
+                    "I32" => BuiltinTypeName(builtin::Type::I32),
+                    "Unit" => BuiltinTypeName(builtin::Type::Unit),
+                    "Bool" => BuiltinTypeName(builtin::Type::Bool),
                     _ => panic!("Unknown type: {}", ident),
                 }
             }
@@ -476,5 +486,10 @@ mod test {
     #[test]
     fn identifiers_with_underscores_lex() {
         should_lex("print_int _foo");
+    }
+
+    #[test]
+    fn builtin_function_identifiers_lex() {
+        should_lex("#print_i32()");
     }
 }

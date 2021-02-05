@@ -25,7 +25,7 @@ impl fmt::Display for Type {
 
 /// Represents some known builtin function
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum BuiltinFunction {
+pub enum BuiltinFunction {
     /// A builtin to print the value of an integer
     PrintI32,
 }
@@ -41,8 +41,16 @@ impl BuiltinFunction {
     /// Create a known builtin, by checking for a known name
     pub fn from_name(name: &str) -> Option<Self> {
         match name {
-            "print_i32" => Some(BuiltinFunction::PrintI32),
+            "#print_i32" => Some(BuiltinFunction::PrintI32),
             _ => None,
+        }
+    }
+}
+
+impl fmt::Display for BuiltinFunction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            BuiltinFunction::PrintI32 => write!(f, "#print_i32"),
         }
     }
 }
