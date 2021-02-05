@@ -167,9 +167,11 @@ impl DisplayWithContext for Token {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 enum ErrorType {
     UnexpectedChar(char),
+    UnknownType(String),
+    UnknownBuiltin(String),
 }
 
 impl ErrorType {
@@ -191,9 +193,15 @@ impl IsDiagnostic for Error {
     fn diagnostic(&self, _ctx: &Context) -> Diagnostic {
         use ErrorType::*;
 
-        match self.error {
+        match &self.error {
             UnexpectedChar(c) => Diagnostic::error()
                 .with_message(format!("Unexpected Character: `{}`", c))
+                .with_labels(vec![Label::primary(self.location.file, self.location)]),
+            UnknownType(s) => Diagnostic::error()
+                .with_message(format!("Unknown Type: `{}`", s))
+                .with_labels(vec![Label::primary(self.location.file, self.location)]),
+            UnknownBuiltin(s) => Diagnostic::error()
+                .with_message(format!("Unknown Builtin: `{}`", s))
                 .with_labels(vec![Label::primary(self.location.file, self.location)]),
         }
     }
@@ -371,7 +379,7 @@ impl<'a> Iterator for Lexer<'a> {
             '#' => {
                 let name = self.continue_identifier('#');
                 match builtin::BuiltinFunction::from_name(&name) {
-                    None => panic!("Unknown builtin: {}", name),
+                    None => return Some(Err(ErrorType::UnknownBuiltin(name).at(self.ctx.main_file, self.start, self.end))),
                     Some(b) => BuiltinFunction(b),
                 }
             }
@@ -382,7 +390,7 @@ impl<'a> Iterator for Lexer<'a> {
             c if c.is_uppercase() => {
                 let ident = self.continue_identifier(c);
                 match builtin::Type::from_name(&ident) {
-                    None => panic!("Unknown type: {}", ident),
+                    None => return Some(Err(ErrorType::UnknownType(ident).at(self.ctx.main_file, self.start, self.end))),
                     Some(t) => BuiltinTypeName(t),
                 }
             }
