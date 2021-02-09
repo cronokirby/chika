@@ -140,23 +140,9 @@ fn parse_and_stop(input_file: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-fn typecheck_and_stop(input_file: &Path) -> Result<(), Error> {
-    let mut ctx = Context::with_main_file(input_file)?;
-
-    let tokens = match lex(&mut ctx)? {
-        None => return Ok(()),
-        Some(tokens) => tokens,
-    };
-
-    let ast = match parse(&ctx, tokens)? {
-        None => return Ok(()),
-        Some(tokens) => tokens,
-    };
-
+fn typecheck(ctx: &Context, ast: parser::AST) -> Result<Option<analysis::AST>, Error> {
     match analyze(&ast) {
-        Ok(ast) => {
-            print!("{}", (&ast).with_ctx(&ctx));
-        }
+        Ok(ast) => Ok(Some(ast)),
         Err(errors) => {
             let mut out = StandardStream::stderr(ColorChoice::Always);
             out.set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))?;
@@ -165,8 +151,30 @@ fn typecheck_and_stop(input_file: &Path) -> Result<(), Error> {
             for e in errors {
                 ctx.emit_diagnostic(&mut out, &e.diagnostic(&ctx))?;
             }
+            Ok(None)
         }
+    }
+}
+
+fn typecheck_and_stop(input_file: &Path) -> Result<(), Error> {
+    let mut ctx = Context::with_main_file(input_file)?;
+
+    let tokens = match lex(&mut ctx)? {
+        None => return Ok(()),
+        Some(tokens) => tokens,
     };
+
+    let parsed_ast = match parse(&ctx, tokens)? {
+        None => return Ok(()),
+        Some(parsed_ast) => parsed_ast,
+    };
+
+    let ast = match typecheck(&ctx, parsed_ast)? {
+        None => return Ok(()),
+        Some(ast) => ast,
+    };
+
+    println!("{}", ast.with_ctx(&ctx));
     Ok(())
 }
 
