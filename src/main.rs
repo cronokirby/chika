@@ -9,9 +9,11 @@ mod parser;
 
 use crate::context::DisplayWithContext;
 use analysis::analyze;
+use backend::generate_c;
 use context::{Context, IsDiagnostic};
 use errors::Error;
 
+use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
@@ -179,6 +181,28 @@ fn typecheck_and_stop(input_file: &Path) -> Result<(), Error> {
     Ok(())
 }
 
+fn compile(input_file: &Path, output: &Path) -> Result<(), Error> {
+    let mut ctx = Context::with_main_file(input_file)?;
+
+    let tokens = match lex(&mut ctx)? {
+        None => return Ok(()),
+        Some(tokens) => tokens,
+    };
+
+    let parsed_ast = match parse(&ctx, tokens)? {
+        None => return Ok(()),
+        Some(parsed_ast) => parsed_ast,
+    };
+
+    let ast = match typecheck(&ctx, parsed_ast)? {
+        None => return Ok(()),
+        Some(ast) => ast,
+    };
+
+    let mut file = File::create(output)?;
+    backend::generate_c(&mut file, ast)
+}
+
 fn main() {
     use Command::*;
 
@@ -187,10 +211,7 @@ fn main() {
         Lex { input_file, debug } => lex_and_stop(&input_file, debug),
         Parse { input_file } => parse_and_stop(&input_file),
         TypeCheck { input_file } => typecheck_and_stop(&input_file),
-        Compile { .. } => {
-            eprintln!("Compilation is not yet implemented.");
-            Ok(())
-        }
+        Compile { input_file, output } => compile(&input_file, &output),
     };
     if let Err(e) = res {
         eprintln!("Unexpected Error:\n{}", e);
