@@ -85,9 +85,9 @@ impl<'a> Writer<'a> {
         Ok(())
     }
 
-    fn main_function(&mut self) -> Result<(), Error> {
+    fn main_function(&mut self, main_id: FunctionID) -> Result<(), Error> {
         writeln!(self, "int main() {{")?;
-        writeln!(self, "  puts(\"Hello from Chika!\");")?;
+        writeln!(self, "  {}();", FunctionName::new(main_id))?;
         writeln!(self, "  return 0;")?;
         writeln!(self, "}}")?;
         Ok(())
@@ -98,7 +98,8 @@ impl<'a> Writer<'a> {
         writeln!(self, "")?;
         self.function_declarations(&ast.function_table)?;
         writeln!(self, "")?;
-        self.main_function()
+        let main_id = ast.functions.last().unwrap().id;
+        self.main_function(main_id)
     }
 }
 
