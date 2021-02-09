@@ -78,6 +78,14 @@ impl FunctionTable {
         self.functions.push(function);
         id
     }
+
+    /// Iterate over the functions in this table
+    pub fn iter<'a>(&'a self) -> impl Iterator<Item = (FunctionID, &'a Function)> {
+        self.functions
+            .iter()
+            .enumerate()
+            .map(|(u, f)| (FunctionID(u as u32), f))
+    }
 }
 
 impl Index<FunctionID> for FunctionTable {
