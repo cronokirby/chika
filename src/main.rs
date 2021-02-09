@@ -9,7 +9,6 @@ mod parser;
 
 use crate::context::DisplayWithContext;
 use analysis::analyze;
-use backend::generate_c;
 use context::{Context, IsDiagnostic};
 use errors::Error;
 
