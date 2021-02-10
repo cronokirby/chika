@@ -50,6 +50,7 @@ struct Writer<'a> {
     writer: &'a mut dyn io::Write,
     variable_table: &'a VariableTable,
     function_table: &'a FunctionTable,
+    indent: usize,
 }
 
 impl<'a> Writer<'a> {
@@ -62,7 +63,22 @@ impl<'a> Writer<'a> {
             writer,
             variable_table,
             function_table,
+            indent: 0,
         }
+    }
+
+    fn blank_space(&mut self) -> Result<(), Error> {
+        let indent = self.indent;
+        write!(self, "{:<width$}", "", width = indent)?;
+        Ok(())
+    }
+
+    fn indent(&mut self) {
+        self.indent += 2;
+    }
+
+    fn unindent(&mut self) {
+        self.indent -= 2;
     }
 
     fn includes(&mut self) -> Result<(), Error> {
@@ -153,12 +169,16 @@ impl<'a> Writer<'a> {
     }
 
     fn statement(&mut self, statement: &Statement) -> Result<(), Error> {
+        self.blank_space()?;
         match statement {
             Statement::Block(statements) => {
                 writeln!(self, "{{")?;
+                self.indent();
                 for statement in statements {
                     self.statement(statement)?;
                 }
+                self.unindent();
+                self.blank_space()?;
                 writeln!(self, "}}")?;
             }
             Statement::Expr(expr) => {
