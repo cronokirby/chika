@@ -1,4 +1,4 @@
-use crate::analysis::{FunctionID, FunctionTable, AST};
+use crate::analysis::{FunctionDef, FunctionID, FunctionTable, AST};
 use crate::builtin::Type;
 use crate::errors::Error;
 use io::Write;
@@ -85,6 +85,37 @@ impl<'a> Writer<'a> {
         Ok(())
     }
 
+    fn function(&mut self, table: &FunctionTable, function_def: &FunctionDef) -> Result<(), Error> {
+        let function = &table[function_def.id];
+        write!(
+            self,
+            "{} {}(",
+            CType::new(function.return_type),
+            FunctionName::new(function_def.id)
+        )?;
+        let mut first = true;
+        for (typ, var_id) in function.arg_types.iter().zip(&function_def.args) {
+            if *typ == Type::Unit {
+                continue;
+            }
+            if first {
+                first = false
+            } else {
+                write!(self, ", ")?;
+            }
+            write!(self, "{} {}", CType::new(*typ), var_id)?;
+        }
+        writeln!(self, ") {{\n}}\n")?;
+        Ok(())
+    }
+
+    fn functions(&mut self, table: &FunctionTable, functions: &[FunctionDef]) -> Result<(), Error> {
+        for function in functions {
+            self.function(table, function)?;
+        }
+        Ok(())
+    }
+
     fn main_function(&mut self, main_id: FunctionID) -> Result<(), Error> {
         writeln!(self, "int main() {{")?;
         writeln!(self, "  {}();", FunctionName::new(main_id))?;
@@ -98,6 +129,7 @@ impl<'a> Writer<'a> {
         writeln!(self, "")?;
         self.function_declarations(&ast.function_table)?;
         writeln!(self, "")?;
+        self.functions(&ast.function_table, &ast.functions)?;
         let main_id = ast.functions.last().unwrap().id;
         self.main_function(main_id)
     }
