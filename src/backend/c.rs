@@ -1,7 +1,7 @@
 use crate::analysis::{
-    Expr, FunctionDef, FunctionID, FunctionTable, Statement, VariableTable, AST,
+    Expr, FunctionDef, FunctionID, FunctionTable, Statement, VariableID, VariableTable, AST,
 };
-use crate::builtin::Type;
+use crate::builtin::{BuiltinFunction, Type};
 use crate::errors::Error;
 use io::Write;
 use std::fmt;
@@ -97,8 +97,59 @@ impl<'a> Writer<'a> {
         Ok(())
     }
 
-    fn expr(&mut self, expr: &Expr) -> Result<(), Error> {
-        Ok(())
+    fn var_is_unit(&self, var_id: VariableID) -> bool {
+        self.variable_table[var_id].typ == Type::Unit
+    }
+
+    fn expr(&mut self, expr: &Expr) -> Result<bool, Error> {
+        match expr {
+            Expr::AssignExpr(var_id, expr) if !self.var_is_unit(*var_id) => {
+                write!(self, "{} = ", var_id)?;
+                self.expr(expr)?;
+                Ok(true)
+            }
+            Expr::BinExpr(op, e1, e2) => {
+                write!(self, "(")?;
+                self.expr(e1)?;
+                write!(self, ") {} (", op)?;
+                self.expr(e2)?;
+                write!(self, ")")?;
+                Ok(true)
+            }
+            Expr::BuiltinFunctionCall(BuiltinFunction::PrintI32, args) => {
+                write!(self, "printf(\"%d\\n\", ")?;
+                self.expr(&args[0])?;
+                write!(self, ")")?;
+                Ok(true)
+            }
+            Expr::FunctionCall(func, args) => {
+                write!(self, "{}(", FunctionName::new(*func))?;
+                let mut comma = false;
+                for arg in args {
+                    if comma {
+                        write!(self, ", ")?;
+                    }
+                    comma = self.expr(arg)?;
+                }
+                write!(self, ")")?;
+                Ok(true)
+            }
+            Expr::IntExpr(u) => {
+                write!(self, "{}", u)?;
+                Ok(true)
+            }
+            Expr::UnaryExpr(op, expr) => {
+                write!(self, "{}(", op)?;
+                self.expr(expr)?;
+                write!(self, ")")?;
+                Ok(true)
+            }
+            Expr::VarExpr(var_id) if !self.var_is_unit(*var_id) => {
+                write!(self, "{}", var_id)?;
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
     }
 
     fn statement(&mut self, statement: &Statement) -> Result<(), Error> {
@@ -169,7 +220,7 @@ impl<'a> Writer<'a> {
 
     fn functions(&mut self, functions: &[FunctionDef]) -> Result<(), Error> {
         for function in functions {
-            self.function( function)?;
+            self.function(function)?;
             writeln!(self, "")?;
         }
         Ok(())
