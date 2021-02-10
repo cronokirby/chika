@@ -1,4 +1,6 @@
-use crate::analysis::{FunctionDef, FunctionID, FunctionTable, AST};
+use crate::analysis::{
+    Expr, FunctionDef, FunctionID, FunctionTable, Statement, VariableTable, AST,
+};
 use crate::builtin::Type;
 use crate::errors::Error;
 use io::Write;
@@ -46,11 +48,21 @@ impl fmt::Display for FunctionName {
 /// This houses utilities and context making things code generation a bit easier.
 struct Writer<'a> {
     writer: &'a mut dyn io::Write,
+    variable_table: &'a VariableTable,
+    function_table: &'a FunctionTable,
 }
 
 impl<'a> Writer<'a> {
-    fn new(writer: &'a mut dyn io::Write) -> Self {
-        Writer { writer }
+    fn new(
+        writer: &'a mut dyn io::Write,
+        variable_table: &'a VariableTable,
+        function_table: &'a FunctionTable,
+    ) -> Self {
+        Writer {
+            writer,
+            variable_table,
+            function_table,
+        }
     }
 
     fn includes(&mut self) -> Result<(), Error> {
@@ -60,8 +72,8 @@ impl<'a> Writer<'a> {
         Ok(())
     }
 
-    fn function_declarations(&mut self, function_table: &FunctionTable) -> Result<(), Error> {
-        for (id, function) in function_table.iter() {
+    fn function_declarations(&mut self) -> Result<(), Error> {
+        for (id, function) in self.function_table.iter() {
             write!(
                 self,
                 "{} {}(",
@@ -85,8 +97,54 @@ impl<'a> Writer<'a> {
         Ok(())
     }
 
-    fn function(&mut self, table: &FunctionTable, function_def: &FunctionDef) -> Result<(), Error> {
-        let function = &table[function_def.id];
+    fn expr(&mut self, expr: &Expr) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn statement(&mut self, statement: &Statement) -> Result<(), Error> {
+        match statement {
+            Statement::Block(statements) => {
+                writeln!(self, "{{")?;
+                for statement in statements {
+                    self.statement(statement)?;
+                }
+                writeln!(self, "}}")?;
+            }
+            Statement::Expr(expr) => {
+                self.expr(expr)?;
+                writeln!(self, ";")?;
+            }
+            Statement::If(cond, if_branch, maybe_else) => {
+                write!(self, "if (")?;
+                self.expr(cond)?;
+                writeln!(self, ")")?;
+                self.statement(if_branch)?;
+                if let Some(else_branch) = maybe_else {
+                    writeln!(self, "else")?;
+                    self.statement(else_branch)?;
+                }
+            }
+            Statement::Return(maybe_expr) => {
+                write!(self, "return ")?;
+                if let Some(expr) = maybe_expr {
+                    self.expr(expr)?;
+                }
+                writeln!(self, ";")?;
+            }
+            Statement::Var(var_id, expr) => {
+                let variable = &self.variable_table[*var_id];
+                if variable.typ != Type::Unit {
+                    write!(self, "{} {} = ", CType::new(variable.typ), var_id)?;
+                    self.expr(expr)?;
+                    writeln!(self, ";")?;
+                }
+            }
+        };
+        Ok(())
+    }
+
+    fn function(&mut self, function_def: &FunctionDef) -> Result<(), Error> {
+        let function = &self.function_table[function_def.id];
         write!(
             self,
             "{} {}(",
@@ -105,13 +163,14 @@ impl<'a> Writer<'a> {
             }
             write!(self, "{} {}", CType::new(*typ), var_id)?;
         }
-        writeln!(self, ") {{\n}}\n")?;
-        Ok(())
+        writeln!(self, ")")?;
+        self.statement(&function_def.body)
     }
 
-    fn functions(&mut self, table: &FunctionTable, functions: &[FunctionDef]) -> Result<(), Error> {
+    fn functions(&mut self, functions: &[FunctionDef]) -> Result<(), Error> {
         for function in functions {
-            self.function(table, function)?;
+            self.function( function)?;
+            writeln!(self, "")?;
         }
         Ok(())
     }
@@ -124,13 +183,13 @@ impl<'a> Writer<'a> {
         Ok(())
     }
 
-    fn generate(&mut self, ast: AST) -> Result<(), Error> {
+    fn generate(&mut self, functions: &[FunctionDef]) -> Result<(), Error> {
         self.includes()?;
         writeln!(self, "")?;
-        self.function_declarations(&ast.function_table)?;
+        self.function_declarations()?;
         writeln!(self, "")?;
-        self.functions(&ast.function_table, &ast.functions)?;
-        let main_id = ast.functions.last().unwrap().id;
+        self.functions(&functions)?;
+        let main_id = functions.last().unwrap().id;
         self.main_function(main_id)
     }
 }
@@ -146,5 +205,5 @@ impl<'a> io::Write for Writer<'a> {
 }
 
 pub fn generate(writer: &mut dyn io::Write, ast: AST) -> Result<(), Error> {
-    Writer::new(writer).generate(ast)
+    Writer::new(writer, &ast.variable_table, &ast.function_table).generate(&ast.functions)
 }
