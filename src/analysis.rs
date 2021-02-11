@@ -299,6 +299,8 @@ impl DisplayWithContext for FunctionDef {
 pub struct AST {
     /// The functions defined in our AST
     pub functions: Vec<FunctionDef>,
+    /// The main function of our program
+    pub main_function: FunctionID,
     /// Information about the functions in our program
     pub function_table: FunctionTable,
     /// Information about the variables in our program
@@ -398,6 +400,9 @@ enum ErrorType {
     BadReturnType(StringID, Type, Type),
     IncorrectArgumentCount(StringID, usize, usize),
     IncorrectBuiltinArgumentCount(BuiltinFunction, usize, usize),
+    NoMainFunction,
+    IncorrectMainFunctionReturn(Type),
+    MainFunctionHasArgs,
 }
 
 impl ErrorType {
@@ -484,6 +489,25 @@ impl IsDiagnostic for Error {
                     "builtin `{}` takes {} arguments",
                     name, expected
                 )]),
+            NoMainFunction => Diagnostic::error()
+                .with_message("No main function found")
+                .with_labels(vec![Label::primary(self.location.file, self.location)]),
+            MainFunctionHasArgs => Diagnostic::error()
+                .with_message("Main function has arguments")
+                .with_labels(vec![Label::primary(self.location.file, self.location)
+                    .with_message("no arguments should be present here")]),
+            IncorrectMainFunctionReturn(actual) => Diagnostic::error()
+                .with_message("Incorrect return type for main function")
+                .with_labels(vec![Label::primary(self.location.file, self.location)
+                    .with_message(format!(
+                        "this has type `{}` instead of type `{}`",
+                        actual,
+                        Type::Unit
+                    ))])
+                .with_notes(vec![format!(
+                    "the main function should return type `{}`",
+                    Type::Unit
+                )]),
         }
     }
 }
@@ -525,24 +549,28 @@ fn function_doesnt_return(function: parser::Function) -> Option<Location> {
     }
 }
 
-struct Analyzer {
+struct Analyzer<'a> {
+    ctx: &'a Context,
     function_ids: HashMap<StringID, FunctionID>,
     function_table: FunctionTable,
     variable_table: VariableTable,
     scopes: Scopes,
     constraints: Vec<Constraint>,
     current_function: Option<FunctionID>,
+    main_function: Option<FunctionID>,
 }
 
-impl Analyzer {
-    fn new() -> Self {
+impl<'a> Analyzer<'a> {
+    fn new(ctx: &'a Context) -> Self {
         Analyzer {
+            ctx,
             function_ids: HashMap::new(),
             function_table: FunctionTable::new(),
             variable_table: VariableTable::new(),
             scopes: Scopes::new(),
             constraints: Vec::new(),
             current_function: None,
+            main_function: None,
         }
     }
 
@@ -768,7 +796,7 @@ impl Analyzer {
         // This scheme allows parameters to shadow preceding ones.
         // The rationale is that this is similar to var statements inside a function
         for i in 0..function.param_count() {
-            let (name, typ) = function.param(i);
+            let (_, name, typ) = function.param(i);
             let var = Variable::new(name, typ);
             let var_id = self.variable_table.add_variable(var);
             self.scopes.put(name, var_id);
@@ -794,14 +822,26 @@ impl Analyzer {
         }
         let mut arg_types = Vec::new();
         for i in 0..function.param_count() {
-            let (_, typ) = function.param(i);
+            let (_, _, typ) = function.param(i);
             arg_types.push(typ);
         }
+        let arg_types_not_empty = !arg_types.is_empty();
         let ret_type = function.return_type();
         let id = self
             .function_table
             .add_function(Function::new(name, ret_type, arg_types));
         self.function_ids.insert(name, id);
+
+        if self.main_function.is_none() && self.ctx.get_string(name) == "main" {
+            self.main_function = Some(id);
+            if arg_types_not_empty {
+                return Err(ErrorType::MainFunctionHasArgs.at(function.params_location().clone()));
+            }
+            if ret_type != Type::Unit {
+                return Err(ErrorType::IncorrectMainFunctionReturn(ret_type)
+                    .at(function.return_type_location().clone()));
+            }
+        }
         Ok(())
     }
 
@@ -851,18 +891,28 @@ fn solve_constraints(functions: &FunctionTable, constraints: Vec<Constraint>) ->
     errors
 }
 
-pub fn analyze(ast: &parser::AST) -> Result<AST, Vec<Error>> {
-    let mut analyzer = Analyzer::new();
+pub fn analyze(ctx: &Context, ast: &parser::AST) -> Result<AST, Vec<Error>> {
+    let mut analyzer = Analyzer::new(ctx);
     let functions = match analyzer.run(ast) {
         Err(e) => return Err(vec![e]),
         Ok(ast) => ast,
     };
-    let errors = solve_constraints(&analyzer.function_table, analyzer.constraints);
+    let mut errors = solve_constraints(&analyzer.function_table, analyzer.constraints);
+    let main_function = match analyzer.main_function {
+        Some(main_function) => main_function,
+        None => {
+            let main_file = ctx.main_file;
+            let location = Location::new(main_file, 0, 0);
+            errors.push(ErrorType::NoMainFunction.at(location));
+            return Err(errors);
+        }
+    };
     if !errors.is_empty() {
         return Err(errors);
     }
     Ok(AST {
         functions,
+        main_function,
         function_table: analyzer.function_table,
         variable_table: analyzer.variable_table,
     })

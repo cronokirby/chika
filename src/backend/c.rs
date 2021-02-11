@@ -246,22 +246,21 @@ impl<'a> Writer<'a> {
         Ok(())
     }
 
-    fn main_function(&mut self, main_id: FunctionID) -> Result<(), Error> {
+    fn main_function(&mut self, main_function: FunctionID) -> Result<(), Error> {
         writeln!(self, "int main() {{")?;
-        writeln!(self, "  {}();", FunctionName::new(main_id))?;
+        writeln!(self, "  {}();", FunctionName::new(main_function))?;
         writeln!(self, "  return 0;")?;
         writeln!(self, "}}")?;
         Ok(())
     }
 
-    fn generate(&mut self, functions: &[FunctionDef]) -> Result<(), Error> {
+    fn generate(&mut self, main_function: FunctionID, functions: &[FunctionDef]) -> Result<(), Error> {
         self.includes()?;
         writeln!(self, "")?;
         self.function_declarations()?;
         writeln!(self, "")?;
         self.functions(&functions)?;
-        let main_id = functions.last().unwrap().id;
-        self.main_function(main_id)
+        self.main_function(main_function)
     }
 }
 
@@ -276,5 +275,5 @@ impl<'a> io::Write for Writer<'a> {
 }
 
 pub fn generate(writer: &mut dyn io::Write, ast: AST) -> Result<(), Error> {
-    Writer::new(writer, &ast.variable_table, &ast.function_table).generate(&ast.functions)
+    Writer::new(writer, &ast.variable_table, &ast.function_table).generate(ast.main_function, &ast.functions)
 }
