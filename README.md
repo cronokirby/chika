@@ -14,27 +14,24 @@ decisions we're left with in C after all of these years.
 *This syntax is still experiemental*.
 
 ```chika
-struct X {
-  y: I32;
-  z: I32;
-}
-
 fn foo(x: I32, y: I32): I32 {
-  var s: X = {y: y, z: x};
-  return s.y + s.z;
+  return x + y;
 }
 
-fn main() {
-  print_int(foo(33, 34));
+fn main(): Unit {
+  #print_i32(foo(33, 34));
 }
 ```
 
 # Usage
 
-Nothing is implemented yet, but this is how the CLI looks so far:
+At the moment, a basic C backend has been implemented, along with a small subset
+of the language.
+
+The CLI looks like this
 
 ```txt
-chika 0.1.0
+chika 0.2.0
 A command that our CLI can process
 
 USAGE:
@@ -49,22 +46,20 @@ SUBCOMMANDS:
     help          Prints this message or the help of the given subcommand(s)
     lex           Print the tokens produced by the lexer
     parse         Print the AST produced by the parser
-    simplify      Print the simplified AST
     type-check    Run the type checker, printing the typed AST
 ```
 
 ## Lexing
 
-**Not implemented yet**
-
 ```txt
-chika-lex 0.1.0
+chika-lex 0.2.0
 Print the tokens produced by the lexer
 
 USAGE:
-    chika lex <INPUT_FILE>
+    chika lex [FLAGS] <INPUT_FILE>
 
 FLAGS:
+        --debug      Print using debug format instead
     -h, --help       Prints help information
     -V, --version    Prints version information
 
@@ -74,10 +69,8 @@ ARGS:
 
 ## Parsing
 
-**Not implemented yet**
-
 ```txt
-chika-parse 0.1.0
+chika-parse 0.2.0
 Print the AST produced by the parser
 
 USAGE:
@@ -91,31 +84,10 @@ ARGS:
     <INPUT_FILE>    The file containing Chika code you want to parse
 ```
 
-## Simplification
-
-**Not implemented yet**
-
-```txt
-chika-simplify 0.1.0
-Print the simplified AST
-
-USAGE:
-    chika simplify <INPUT_FILE>
-
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
-
-ARGS:
-    <INPUT_FILE>    The file containing Chika code you want to simplify
-```
-
 ## Type Checking
 
-**Not implemented yet**
-
 ```
-chika-type-check 0.1.0
+chika-type-check 0.2.0
 Run the type checker, printing the typed AST
 
 USAGE:
@@ -131,10 +103,11 @@ ARGS:
 
 ## Compilation
 
-**Not implemented yet**
+At the moment, only a basic C backend has been implemented, and compilation
+will output a C file.
 
 ```txt
-chika-compile 0.1.0
+chika-compile 0.2.0
 Compile the file
 
 USAGE:
