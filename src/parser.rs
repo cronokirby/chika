@@ -881,6 +881,12 @@ impl Function {
         branch[branch.len() - 2].typ()
     }
 
+    /// The location of the return type for this function
+    pub fn return_type_location(&self) -> &Location {
+        let branch = self.0.branch();
+        &branch[branch.len() - 2].location
+    }
+
     /// The body of this function
     pub fn body(&self) -> BlockStatement {
         BlockStatement(self.0.branch().last().unwrap().clone())
@@ -892,11 +898,20 @@ impl Function {
     }
 
     /// The ith parameter to this function
-    pub fn param(&self, i: usize) -> (StringID, Type) {
+    pub fn param(&self, i: usize) -> (Location, StringID, Type) {
         let j = 2 * i + 1;
-        let string = self.0.branch()[j].string();
-        let typ = self.0.branch()[j + 1].typ();
-        (string, typ)
+        let string = self.0.branch()[j].clone();
+        let typ = self.0.branch()[j + 1].clone();
+        (
+            string.location.to(&typ.location),
+            string.string(),
+            typ.typ(),
+        )
+    }
+
+    /// The location of the parameters for this function
+    pub fn params_location(&self) -> Location {
+        self.param(0).0.to(&self.param(self.param_count() - 1).0)
     }
 }
 
@@ -904,7 +919,7 @@ impl DisplayWithContext for Function {
     fn fmt_with(&self, ctx: DisplayContext<'_>, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "(fn {}", ctx.ctx.get_string(self.name()))?;
         for i in 0..self.param_count() {
-            let (s, typ) = self.param(i);
+            let (_, s, typ) = self.param(i);
             write!(f, " (: {} {})", ctx.ctx.get_string(s), typ)?;
         }
         write!(f, " {} {})", self.return_type(), self.body().with_ctx(ctx))

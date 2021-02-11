@@ -143,7 +143,7 @@ fn parse_and_stop(input_file: &Path) -> Result<(), Error> {
 }
 
 fn typecheck(ctx: &Context, ast: parser::AST) -> Result<Option<analysis::AST>, Error> {
-    match analyze(&ast) {
+    match analyze(ctx, &ast) {
         Ok(ast) => Ok(Some(ast)),
         Err(errors) => {
             let mut out = StandardStream::stderr(ColorChoice::Always);
