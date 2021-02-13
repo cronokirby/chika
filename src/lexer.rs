@@ -273,6 +273,14 @@ impl<'a> Lexer<'a> {
         }
         acc
     }
+
+    fn continue_comment(&mut self) {
+        while let Some(peek) = self.next_char() {
+            if peek == '\n' {
+                return;
+            }
+        }
+    }
 }
 
 impl<'a> Iterator for Lexer<'a> {
@@ -299,28 +307,33 @@ impl<'a> Iterator for Lexer<'a> {
             ':' => Colon,
             '+' => match self.chars.peek() {
                 Some('=') => {
-                    self.next();
+                    self.next_char();
                     PlusEqual
                 }
                 _ => Plus,
             },
             '-' => match self.chars.peek() {
                 Some('=') => {
-                    self.next();
+                    self.next_char();
                     MinusEqual
                 }
                 _ => Minus,
             },
             '/' => match self.chars.peek() {
                 Some('=') => {
-                    self.next();
+                    self.next_char();
                     DivEqual
+                }
+                Some('/') => {
+                    self.next_char();
+                    self.continue_comment();
+                    return self.next();
                 }
                 _ => Div,
             },
             '*' => match self.chars.peek() {
                 Some('=') => {
-                    self.next();
+                    self.next_char();
                     TimesEqual
                 }
                 _ => Times,
@@ -328,50 +341,50 @@ impl<'a> Iterator for Lexer<'a> {
             ',' => Comma,
             '<' => match self.chars.peek() {
                 Some('=') => {
-                    self.next();
+                    self.next_char();
                     LessEqual
                 }
                 _ => Less,
             },
             '>' => match self.chars.peek() {
                 Some('=') => {
-                    self.next();
+                    self.next_char();
                     GreaterEqual
                 }
                 _ => Greater,
             },
             '=' => match self.chars.peek() {
                 Some('=') => {
-                    self.next();
+                    self.next_char();
                     EqualsEquals
                 }
                 _ => Equals,
             },
             '|' => match self.chars.peek() {
                 Some('|') => {
-                    self.next();
+                    self.next_char();
                     OrOr
                 }
                 Some('=') => {
-                    self.next();
+                    self.next_char();
                     OrEqual
                 }
                 _ => Or,
             },
             '&' => match self.chars.peek() {
                 Some('&') => {
-                    self.next();
+                    self.next_char();
                     AndAnd
                 }
                 Some('=') => {
-                    self.next();
+                    self.next_char();
                     AndEqual
                 }
                 _ => And,
             },
             '!' => match self.chars.peek() {
                 Some('=') => {
-                    self.next();
+                    self.next_char();
                     BangEquals
                 }
                 _ => Bang,
@@ -379,7 +392,13 @@ impl<'a> Iterator for Lexer<'a> {
             '#' => {
                 let name = self.continue_identifier('#');
                 match builtin::BuiltinFunction::from_name(&name) {
-                    None => return Some(Err(ErrorType::UnknownBuiltin(name).at(self.ctx.main_file, self.start, self.end))),
+                    None => {
+                        return Some(Err(ErrorType::UnknownBuiltin(name).at(
+                            self.ctx.main_file,
+                            self.start,
+                            self.end,
+                        )))
+                    }
                     Some(b) => BuiltinFunction(b),
                 }
             }
@@ -390,7 +409,13 @@ impl<'a> Iterator for Lexer<'a> {
             c if c.is_uppercase() => {
                 let ident = self.continue_identifier(c);
                 match builtin::Type::from_name(&ident) {
-                    None => return Some(Err(ErrorType::UnknownType(ident).at(self.ctx.main_file, self.start, self.end))),
+                    None => {
+                        return Some(Err(ErrorType::UnknownType(ident).at(
+                            self.ctx.main_file,
+                            self.start,
+                            self.end,
+                        )))
+                    }
                     Some(t) => BuiltinTypeName(t),
                 }
             }

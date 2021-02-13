@@ -1,3 +1,7 @@
+# 0.3.0
+
+- Add single line comments, with `//`
+
 # 0.2.0
 
 This is the first usable version.
