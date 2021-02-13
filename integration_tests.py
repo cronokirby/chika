@@ -27,7 +27,7 @@ def gen_executable(file_name):
     Generate an executable for a given file
     """
     out = subprocess.check_output(
-        f"cargo run -- compile {file_name} -o .out/out.c", shell=True
+        f"cargo run -q -- compile {file_name} -o .out/out.c", shell=True
     ).decode("utf-8")
     if "Error" in out:
         raise Exception("\n".join(out.split("\n")[1:]))
