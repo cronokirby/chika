@@ -1,0 +1,8 @@
+fn foo(): Unit {
+  #print_i32(100);
+}
+
+// OUT(100)
+fn main(): Unit {
+  foo();
+}
