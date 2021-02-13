@@ -1,0 +1,5 @@
+// OUT(111)
+fn main(): Unit {
+  var x: I32 = 111;
+  #print_i32(x);
+}
