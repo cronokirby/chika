@@ -1,0 +1,4 @@
+// OUT(111)
+fn main(): Unit {
+  #print_i32(111);
+}
