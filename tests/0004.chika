@@ -1,0 +1,13 @@
+// OUT(110)
+fn main(): Unit {
+  var x: I32 = 0;
+  if (0 > 0) {
+    x += 1;
+  } else {
+    x += 10;
+  }
+  if (1 > 0) {
+    x += 100;
+  }
+  #print_i32(x);
+}
